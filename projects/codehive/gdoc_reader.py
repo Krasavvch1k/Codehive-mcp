@@ -75,6 +75,18 @@ def list_folder(folder_id: Optional[str] = None) -> dict:
     except Exception:
         folder_name = None
 
+    # Drive API quirk: для shared drive root files().get() повертає name="Drive".
+    # Реальна назва — у drives().get(driveId=...).
+    if folder_name in (None, "Drive") and fid == CODEHIVE_ROOT_FOLDER_ID:
+        try:
+            drive_meta = service.drives().get(
+                driveId=fid,
+                fields="id, name",
+            ).execute()
+            folder_name = drive_meta.get("name") or folder_name
+        except Exception:
+            pass
+
     raw_children = _list_folder_children(fid)
 
     folders: list[dict] = []
