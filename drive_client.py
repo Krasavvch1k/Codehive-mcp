@@ -12,7 +12,7 @@ from typing import Optional
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-from test_drive import get_credentials
+from shared.auth import get_credentials
 from config import CACHE_TTL_SECONDS
 
 

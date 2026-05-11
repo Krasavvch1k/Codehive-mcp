@@ -4,7 +4,7 @@
 """
 
 from googleapiclient.discovery import build
-from test_drive import get_credentials
+from shared.auth import get_credentials
 
 FILES_TO_FIND = {
     "tech_doc": "Worqen_Technical_Documentation",

@@ -1,42 +1,13 @@
 """
-Тестовий скрипт: перевіряє OAuth до Google Drive
-і виводить список перших 10 файлів до яких є доступ.
+Smoke-скрипт OAuth: перевіряє credentials і виводить список перших 10 файлів до яких є доступ.
+
+Production-код (drive_client) тепер імпортує get_credentials з shared.auth.
+Цей файл — лише живий smoke-тест.
 """
 
-import os.path
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-# Scopes — що ми хочемо могти робити
-# readonly = тільки читання, без права запису
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-
-
-def get_credentials():
-    """Отримує OAuth credentials. Перший запуск відкриває браузер."""
-    creds = None
-
-    # Якщо токен вже зберігали — завантажуємо
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-    # Якщо немає або неактуальні — оновлюємо або просимо заново
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-
-        # Зберігаємо токен на майбутнє
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    return creds
+from shared.auth import get_credentials
 
 
 def main():
