@@ -33,6 +33,8 @@ from writers.safety import SafetyError
 from writers.writes_log import read_today_log, read_log_by_date, filter_log
 from parsers.references import validate_references
 
+from projects.codehive.tools import CODEHIVE_TOOLS, dispatch as codehive_dispatch
+
 
 server = Server("worqen-mcp")
 
@@ -598,7 +600,7 @@ def _tools() -> list[Tool]:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return _tools()
+    return _tools() + CODEHIVE_TOOLS
 
 
 def _format_response(data) -> list[TextContent]:
@@ -909,6 +911,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             if file_key not in FILE_IDS:
                 return _format_response({"error": f"Unknown file_key '{file_key}'"})
             return _format_response(is_drive_newer(FILE_IDS[file_key]))
+
+        # ---------- Codehive ----------
+        codehive_result = codehive_dispatch(name, args)
+        if codehive_result is not None:
+            return _format_response(codehive_result)
 
         return _format_response({"error": f"Невідомий tool: {name}"})
 
