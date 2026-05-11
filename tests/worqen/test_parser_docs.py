@@ -1,6 +1,6 @@
 """Smoke-тест парсера docx-документів."""
 
-from parsers.docs import (
+from projects.worqen.parsers.docs import (
     list_doc_keys,
     get_toc,
     get_section,

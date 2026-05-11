@@ -1,6 +1,6 @@
 """Швидкий smoke-тест парсера User Stories."""
 
-from parsers.user_stories import (
+from projects.worqen.parsers.user_stories import (
     list_stories,
     get_story,
     get_next_us_id,

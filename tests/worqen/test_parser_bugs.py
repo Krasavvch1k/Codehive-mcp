@@ -1,6 +1,6 @@
 """Smoke-тест парсера QA Report."""
 
-from parsers.bug_report import (
+from projects.worqen.parsers.bug_report import (
     list_bugs,
     get_bug,
     get_next_bug_id,

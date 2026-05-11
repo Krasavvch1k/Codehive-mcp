@@ -6,13 +6,13 @@ Smoke-тести для writers і нових parser-функцій.
 import sys
 import argparse
 
-from parsers.user_stories import (
+from projects.worqen.parsers.user_stories import (
     find_missing_us_ids,
     is_us_id_free,
     is_valid_us_id_format,
     get_next_us_id,
 )
-from parsers.bug_report import (
+from projects.worqen.parsers.bug_report import (
     find_missing_bug_ids,
     is_bug_id_free,
     is_valid_bug_id_format,
