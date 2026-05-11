@@ -1,15 +1,17 @@
-cat > RUN.md << 'MDEOF'
-# Worqen MCP — Інструкція з запуску і вимкнення
+# CodeHive mcp — Інструкція з запуску і вимкнення
 
 ## ЩО ЦЕ
 
-Локальний MCP-сервер який дає Claude Desktop доступ до робочих
-файлів Worqen у Google Drive (User Stories, QA Report, PRD, Tech Doc).
+Локальний MCP-сервер який дає Claude Desktop доступ до робочих файлів
+у Google Drive: Worqen-документи (User Stories, Bug Report, PRD, Tech Doc)
+і CodeHive Agency shared drive.
 
-Сервер працює на твоєму компі. Cloudflared тунель робить його
-доступним для Claude Desktop по тимчасовому HTTPS URL.
+Сервер працює на твоєму компі. Cloudflared тунель робить його доступним
+для Claude Desktop по тимчасовому HTTPS URL.
 
-Папка проєкту: `~/Documents/codehive-mcp`
+Папка проєкту: `~/Documents/Codehive-mcp`
+
+Повний перелік tools і архітектура — у [README.md](README.md).
 
 ---
 
@@ -21,14 +23,18 @@ cat > RUN.md << 'MDEOF'
 ### Термінал 1 — сервер
 
 ```bash
-cd ~/Documents/codehive-mcp
+cd ~/Documents/Codehive-mcp
 source venv/bin/activate
-python server.py
+python3 server.py
 ```
 
-Має з'явитись: Uvicorn running on http://127.0.0.1:8765
+Має з'явитись: `Uvicorn running on http://127.0.0.1:8765`
 
 Залиш це вікно у спокої. **НЕ ЗАКРИВАЙ.**
+
+> **При першому запуску** відкриється браузер для OAuth-авторизації Google.
+> Підтверди доступ → створиться `token.json`. У наступні рази
+> авторизація не потрібна — токен оновлюється сам.
 
 ### Термінал 2 — тунель
 
@@ -38,7 +44,8 @@ python server.py
 cloudflared tunnel --url http://localhost:8765
 ```
 
-Через 5-15 секунд у виводі буде блок з URL: https://щось-щось-щось-щось.trycloudflare.com 
+Через 5-15 секунд у виводі буде блок з URL:
+`https://<random-words>.trycloudflare.com`
 
 **Скопіюй цей URL.** До нього треба додати `/mcp` у кінці.
 
@@ -55,18 +62,18 @@ cloudflared tunnel --url http://localhost:8765
 Тому при кожному перезапуску тунеля треба оновити URL у Claude.
 
 1. Claude Desktop → **Customize → Connectors**
-2. Знайди **Worqen** → відкрий
+2. Знайди **Codehive-mcp** → відкрий
 3. Edit (або видали і додай заново)
 4. Встав новий URL з `/mcp` у кінці
 5. **Connect**
 
-Після підключення — у новому чаті `+` біля поля вводу → увімкни галочку Worqen.
+Після підключення — у новому чаті `+` біля поля вводу → увімкни галочку Codehive-mcp.
 
 ---
 
 ## ВИКОРИСТАННЯ
 
-У будь-якому чаті Claude Desktop:
+У будь-якому чаті Claude Desktop, наприклад:
 
 - "Покажи user stories у статусі Не реалізовано та пріоритеті Must"
 - "Покажи US-062"
@@ -75,8 +82,9 @@ cloudflared tunnel --url http://localhost:8765
 - "Знайди слово 'commission' у Tech Doc"
 - "Який наступний US-XXX?"
 - "Покажи всі Ficha які ще не перенесені в US"
+- "Що зараз у папці CodeHive Agency у Drive?"
 
-Claude сам обере правильний tool і викличе його.
+Claude сам обере правильний tool (з префіксом `worqen_*` або `codehive_*`) і викличе його.
 
 ---
 
@@ -94,36 +102,9 @@ Claude сам обере правильний tool і викличе його.
 ### Якщо щось зависло
 
 ```bash
-pkill -f "python server.py"
+pkill -f "python3 server.py"
 pkill -f "cloudflared"
 ```
-
----
-
-## ДОСТУПНІ TOOLS (15)
-
-**User Stories:**
-- list_user_stories — фільтри: epic, status, priority, version, search
-- get_user_story — повна сторі за ID
-- next_us_id — наступний вільний номер
-- epics_summary — статистика по епіках
-- find_us_dependents — хто залежить від сторі
-
-**QA Report:**
-- list_bugs — фільтри: priority, status, bug_type, search
-- get_bug — повний баг за ID
-- next_bug_id — наступний номер
-- bugs_summary — статистика
-- list_ficha — продуктові ідеї
-
-**Документи (tech_doc / prd_bootstrap / prd_v1_1):**
-- list_doc_sections — TOC
-- get_doc_section — текст секції
-- search_in_doc — пошук
-
-**Утиліти:**
-- list_files — які файли підтримує сервер
-- clear_cache — скинути кеш (TTL 60с) якщо файл щойно оновлено
 
 ---
 
@@ -138,9 +119,18 @@ pkill -f "cloudflared"
 
 ### "Файл не знайдено" або старі дані
 
-clear_cache
+```
+worqen_clear_cache
+```
 
 Викличе скидання кешу. Або просто почекай 60 секунд — TTL автоматичний.
+
+### Claude бачить старі назви тулів (без префікса)
+
+Connector у Claude UI кешує schema агресивно. Після рестарту сервера
+старі назви можуть жити ще 5-10 хвилин. Рішення:
+- Disconnect/connect connector у Claude Desktop руками, або
+- Просто почекати.
 
 ### Тунель помер сам по собі
 
@@ -164,14 +154,6 @@ curl -X POST https://твій-тунель.trycloudflare.com/mcp/ \
 
 Якщо набридне щодня запускати два термінали — є два шляхи:
 
-1. **Bash-скрипт** який стартує обидва процеси однією командою
-2. **Hetzner VPS $5/міс** — сервер живе постійно, URL не змінюється,
+1. **Bash-скрипт** який стартує обидва процеси однією командою (lazy variant).
+2. **VPS $5/міс** — сервер живе постійно, URL не змінюється,
    жодних запусків. Питання комфорту vs $60/рік.
-
-Питай Claude.ai якщо захочеш зробити будь-який з варіантів.
-MDEOF
-
-ls -la RUN.md
-
-head -30 RUN.md
-
