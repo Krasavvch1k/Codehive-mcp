@@ -19,7 +19,7 @@ from copy import copy
 
 from openpyxl import load_workbook
 
-from drive_client import (
+from shared.drive_client import (
     download_file,
     upload_file_content,
     fetch_current_drive_modified,

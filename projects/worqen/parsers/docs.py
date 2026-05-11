@@ -15,7 +15,7 @@ from docx.document import Document as _DocumentType
 from docx.table import Table
 from docx.oxml.ns import qn
 
-from drive_client import download_file
+from shared.drive_client import download_file
 from projects.worqen.config import FILE_IDS, FILE_FORMATS
 
 

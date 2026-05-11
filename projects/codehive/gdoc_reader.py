@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from drive_client import (
+from shared.drive_client import (
     _list_folder_children,
     download_file,
     _get_service,

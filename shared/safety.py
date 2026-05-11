@@ -11,7 +11,7 @@ projects/<name>/safety.py і може re-exportувати символи з ць
 
 from typing import Optional
 
-from drive_client import fetch_current_drive_modified
+from shared.drive_client import fetch_current_drive_modified
 
 
 class SafetyError(Exception):

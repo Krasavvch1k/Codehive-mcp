@@ -21,7 +21,7 @@
 import re
 from typing import Optional
 
-from drive_client import (
+from shared.drive_client import (
     download_file,
     list_docs_in_folder_recursive,
 )

@@ -23,12 +23,12 @@ from projects.worqen.writers.us_writer import update_story, create_story
 from projects.worqen.writers.bug_writer import update_bug, create_bug
 from projects.worqen.config import FILE_IDS
 
-from drive_client import (
+from shared.drive_client import (
     clear_cache as clear_drive_cache,
     get_file_metadata,
     is_drive_newer,
 )
-from response_utils import strip_empty, format_list_response
+from shared.response_utils import strip_empty, format_list_response
 from projects.worqen.safety import SafetyError
 from shared.writes_log import read_today_log, read_log_by_date, filter_log
 

@@ -14,7 +14,7 @@ from projects.worqen.config import (
     OBSOLETE_NUMBERS,
     OPEN_QUESTION_MARKERS,
 )
-import snapshot as snap
+from shared import snapshot as snap
 
 
 # ====================== detect_conflicts ======================

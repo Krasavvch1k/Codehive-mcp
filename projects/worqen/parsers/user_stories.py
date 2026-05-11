@@ -7,7 +7,7 @@ import re
 from typing import Optional
 from openpyxl import load_workbook
 
-from drive_client import download_file
+from shared.drive_client import download_file
 from projects.worqen.config import FILE_IDS, SCAN_TITLE_TRUNCATE
 
 
