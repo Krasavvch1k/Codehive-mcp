@@ -1,10 +1,6 @@
 """Read operations for the CodeHive Agency Drive folder."""
 
-import io
-import re
 from typing import Optional
-
-from docx import Document
 
 from drive_client import (
     _list_folder_children,
@@ -16,6 +12,11 @@ from projects.codehive.config import (
     GOOGLE_DOC_MIME,
     GOOGLE_FOLDER_MIME,
     CODEHIVE_MAX_RECURSION_DEPTH,
+)
+from shared.gdoc import (
+    docx_bytes_to_markdown,
+    docx_bytes_to_plain_text,
+    extract_snippet,
 )
 
 
@@ -193,33 +194,7 @@ def read_doc(query: str) -> dict:
     doc_meta = _resolve_doc(query, gdocs)
 
     content = download_file(doc_meta["id"], fmt="gdoc")
-    docx_doc = Document(io.BytesIO(content))
-
-    pieces: list[str] = []
-    for para in docx_doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            continue
-        style = para.style.name if para.style else ""
-        m = re.match(r"^Heading\s+(\d+)$", style)
-        if m:
-            level = int(m.group(1))
-            pieces.append(f"{'#' * level} {text}")
-        else:
-            pieces.append(text)
-
-    for table in docx_doc.tables:
-        rows = []
-        for row in table.rows:
-            cells = [c.text.strip().replace("\n", " ") for c in row.cells]
-            rows.append(" | ".join(cells))
-        if rows:
-            if len(rows) > 1:
-                sep = " | ".join(["---"] * len(table.rows[0].cells))
-                rows.insert(1, sep)
-            pieces.append("\n".join(rows))
-
-    text = "\n\n".join(pieces)
+    text = docx_bytes_to_markdown(content)
 
     return {
         "id": doc_meta["id"],
@@ -260,17 +235,9 @@ def search(
         for d in gdocs:
             try:
                 content = download_file(d["id"], fmt="gdoc")
-                docx_doc = Document(io.BytesIO(content))
-                full_text = "\n".join(p.text for p in docx_doc.paragraphs)
-                pos = full_text.lower().find(q_lower)
-                if pos != -1:
-                    start = max(0, pos - context_chars // 2)
-                    end = min(len(full_text), pos + len(query) + context_chars // 2)
-                    snippet = full_text[start:end]
-                    if start > 0:
-                        snippet = "..." + snippet
-                    if end < len(full_text):
-                        snippet = snippet + "..."
+                full_text = docx_bytes_to_plain_text(content)
+                snippet = extract_snippet(full_text, query, context_chars)
+                if snippet is not None:
                     content_matches.append({
                         "id": d["id"],
                         "name": d["name"],

@@ -18,17 +18,19 @@
 Документи — Google Docs (експортуємо у docx через drive_client.download_file fmt='gdoc').
 """
 
-import io
 import re
 from typing import Optional
-
-from docx import Document
 
 from drive_client import (
     download_file,
     list_docs_in_folder_recursive,
 )
 from projects.worqen.config import TEAM_DISCUSSIONS_FOLDER_ID
+from shared.gdoc import (
+    docx_bytes_to_markdown,
+    docx_bytes_to_plain_text,
+    extract_snippet,
+)
 
 
 # ---------- Парсинг метаданих з назви ----------
@@ -268,35 +270,7 @@ def read_team_discussion(query: str) -> dict:
 
     # Завантажуємо як gdoc (всі файли в цій папці — Google Docs)
     content = download_file(doc_meta["id"], fmt="gdoc")
-    docx_doc = Document(io.BytesIO(content))
-
-    # Простий markdown-рендер (повторює логіку docs.get_full_text)
-    pieces: list[str] = []
-    for para in docx_doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            continue
-        style = para.style.name if para.style else ""
-        m = re.match(r"^Heading\s+(\d+)$", style)
-        if m:
-            level = int(m.group(1))
-            pieces.append(f"{'#' * level} {text}")
-        else:
-            pieces.append(text)
-
-    # Таблиці
-    for table in docx_doc.tables:
-        rows = []
-        for row in table.rows:
-            cells = [c.text.strip().replace("\n", " ") for c in row.cells]
-            rows.append(" | ".join(cells))
-        if rows:
-            if len(rows) > 1:
-                sep = " | ".join(["---"] * len(table.rows[0].cells))
-                rows.insert(1, sep)
-            pieces.append("\n".join(rows))
-
-    text = "\n\n".join(pieces)
+    text = docx_bytes_to_markdown(content)
 
     return {
         "id": doc_meta["id"],
@@ -357,17 +331,9 @@ def search_team_discussions(
         for d in enriched:
             try:
                 content = download_file(d["id"], fmt="gdoc")
-                docx_doc = Document(io.BytesIO(content))
-                full_text = "\n".join(p.text for p in docx_doc.paragraphs)
-                pos = full_text.lower().find(q_lower)
-                if pos != -1:
-                    start = max(0, pos - context_chars // 2)
-                    end = min(len(full_text), pos + len(query) + context_chars // 2)
-                    snippet = full_text[start:end]
-                    if start > 0:
-                        snippet = "..." + snippet
-                    if end < len(full_text):
-                        snippet = snippet + "..."
+                full_text = docx_bytes_to_plain_text(content)
+                snippet = extract_snippet(full_text, query, context_chars)
+                if snippet is not None:
                     content_matches.append({
                         "id": d["id"],
                         "name": d["name"],
