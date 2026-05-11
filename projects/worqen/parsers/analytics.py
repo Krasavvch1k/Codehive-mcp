@@ -7,8 +7,8 @@ import re
 from typing import Optional
 from datetime import datetime
 
-from parsers import user_stories as us_parser
-from parsers import bug_report as bug_parser
+from projects.worqen.parsers import user_stories as us_parser
+from projects.worqen.parsers import bug_report as bug_parser
 from projects.worqen.config import (
     FORBIDDEN_TERMS,
     OBSOLETE_NUMBERS,

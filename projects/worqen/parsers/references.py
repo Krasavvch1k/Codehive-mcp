@@ -12,8 +12,8 @@ validate_references() повертає:
 import re
 from typing import Optional
 
-from parsers.user_stories import get_raw_stories
-from parsers.bug_report import get_raw_bugs
+from projects.worqen.parsers.user_stories import get_raw_stories
+from projects.worqen.parsers.bug_report import get_raw_bugs
 
 
 US_FIELDS_TO_SCAN = [
