@@ -36,7 +36,7 @@ from parsers.references import validate_references
 from projects.codehive.tools import CODEHIVE_TOOLS, dispatch as codehive_dispatch
 
 
-server = Server("worqen-mcp")
+server = Server("codehive-mcp")
 
 
 # Список ключів doc-документів для enum-полів у tools.

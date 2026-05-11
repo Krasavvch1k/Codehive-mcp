@@ -9,7 +9,7 @@ cat > RUN.md << 'MDEOF'
 Сервер працює на твоєму компі. Cloudflared тунель робить його
 доступним для Claude Desktop по тимчасовому HTTPS URL.
 
-Папка проєкту: `~/Documents/worqen-mcp`
+Папка проєкту: `~/Documents/codehive-mcp`
 
 ---
 
@@ -21,7 +21,7 @@ cat > RUN.md << 'MDEOF'
 ### Термінал 1 — сервер
 
 ```bash
-cd ~/Documents/worqen-mcp
+cd ~/Documents/codehive-mcp
 source venv/bin/activate
 python server.py
 ```

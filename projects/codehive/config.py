@@ -1,4 +1,4 @@
-"""Configuration for the Codehive module in worqen-mcp."""
+"""Configuration for the Codehive module in codehive-mcp."""
 
 import os
 from dotenv import load_dotenv

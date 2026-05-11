@@ -1,4 +1,4 @@
-# worqen-mcp
+# codehive-mcp
 
 MCP-сервер для роботи з документами проєкту [Worqen](https://worqen.com) у Google Drive.
 
@@ -53,8 +53,8 @@ MCP-сервер для роботи з документами проєкту [W
 ## Встановлення
 
 ```bash
-git clone https://github.com/Krasavvch1k/worqen-mcp.git
-cd worqen-mcp
+git clone https://github.com/Krasavvch1k/Codehive-mcp.git
+cd codehive-mcp
 
 python3 -m venv venv
 source venv/bin/activate
@@ -96,9 +96,9 @@ cp .env.example .env
 ```json
 {
   "mcpServers": {
-    "worqen-mcp": {
-      "command": "/абсолютний/шлях/до/worqen-mcp/venv/bin/python",
-      "args": ["/абсолютний/шлях/до/worqen-mcp/server.py"]
+    "codehive-mcp": {
+      "command": "/абсолютний/шлях/до/codehive-mcp/venv/bin/python",
+      "args": ["/абсолютний/шлях/до/codehive-mcp/server.py"]
     }
   }
 }
@@ -109,7 +109,7 @@ cp .env.example .env
 ## Структура проєкту
 
 ```
-worqen-mcp/
+codehive-mcp/
 ├── server.py              — MCP сервер, реєстрація tools
 ├── config.py              — конфіг (FILE_IDS читаються з .env)
 ├── drive_client.py        — обгортка над Google Drive API
