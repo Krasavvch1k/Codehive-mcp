@@ -1,0 +1,52 @@
+# Секрети — критично
+.env
+.env.local
+.env.*
+!.env.example
+credentials.json
+token.json
+token.pickle
+*.token
+service_account.json
+
+# Бекапи з попередніх сесій
+*.before_*
+*.bak
+
+# Локальні дані MCP сервера
+writes_log/
+snapshots/
+cache/
+downloaded_files/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Логи
+*.log
+logs/
+
+# Тестові артефакти
+.pytest_cache/
+.coverage
