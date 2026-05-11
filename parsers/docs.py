@@ -16,7 +16,7 @@ from docx.table import Table
 from docx.oxml.ns import qn
 
 from drive_client import download_file
-from config import FILE_IDS, FILE_FORMATS
+from projects.worqen.config import FILE_IDS, FILE_FORMATS
 
 
 # Ключі FILE_IDS які є doc-документами (включно з gdoc — він експортується у docx).

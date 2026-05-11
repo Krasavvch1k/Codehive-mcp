@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 from drive_client import fetch_current_drive_modified
-from config import SNAPSHOT_DIR
+from shared.config import SNAPSHOT_DIR
 
 
 class SafetyError(Exception):

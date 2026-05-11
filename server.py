@@ -25,7 +25,7 @@ from drive_client import (
     get_file_metadata,
     is_drive_newer,
 )
-from config import FILE_IDS
+from projects.worqen.config import FILE_IDS
 from response_utils import strip_empty, format_list_response
 from writers.us_writer import update_story, create_story
 from writers.bug_writer import update_bug, create_bug

@@ -1,13 +1,11 @@
 """
-Конфігурація MCP-сервера Worqen.
+Worqen-specific конфігурація.
+
+Drive файли, поля US/BUG, тригери для detect_conflicts, термін-фільтри.
 """
 
 import os
 
-from dotenv import load_dotenv
-
-# Завантажуємо .env з кореня проєкту
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 # ----- Drive файли -----
 #
 # FILE_FORMATS визначає як drive_client завантажує файл:
@@ -43,26 +41,10 @@ FILE_FORMATS = {
     "qa_report":     "xlsx",
 }
 
-# ----- Кеш -----
-
-CACHE_TTL_SECONDS = 30
-
-# ----- Pagination -----
-
-DEFAULT_LIST_LIMIT = 100
-MAX_LIST_LIMIT = 500
-TABLE_FORMAT_THRESHOLD = 20
-
 # ----- Truncation для scan-tier -----
 
 SCAN_TITLE_TRUNCATE = 200
 SCAN_BUG_DESC_TRUNCATE = 150
-
-# ----- Snapshot -----
-
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-SNAPSHOT_DIR = os.path.join(PROJECT_DIR, "snapshots")
-SNAPSHOT_RETENTION_DAYS = 30
 
 # ----- Тригери для detect_conflicts -----
 
@@ -102,7 +84,6 @@ OPEN_QUESTION_MARKERS = [
 TEAM_DISCUSSIONS_FOLDER_ID = os.getenv("DRIVE_TEAM_DISCUSSIONS_FOLDER_ID", "")
 TEAM_DISCUSSIONS_DEFAULT_LIMIT = 50
 TEAM_DISCUSSIONS_MAX_LIMIT = 200
-
 
 # ----- Writer whitelists -----
 

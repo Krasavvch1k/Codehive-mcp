@@ -8,7 +8,7 @@ import io
 from docx import Document
 
 from drive_client import download_file
-from config import FILE_IDS
+from projects.worqen.config import FILE_IDS
 
 
 def inspect(file_key: str):

@@ -9,7 +9,7 @@ from datetime import datetime
 
 from parsers import user_stories as us_parser
 from parsers import bug_report as bug_parser
-from config import (
+from projects.worqen.config import (
     FORBIDDEN_TERMS,
     OBSOLETE_NUMBERS,
     OPEN_QUESTION_MARKERS,

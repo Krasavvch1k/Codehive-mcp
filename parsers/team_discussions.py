@@ -28,7 +28,7 @@ from drive_client import (
     download_file,
     list_docs_in_folder_recursive,
 )
-from config import TEAM_DISCUSSIONS_FOLDER_ID
+from projects.worqen.config import TEAM_DISCUSSIONS_FOLDER_ID
 
 
 # ---------- Парсинг метаданих з назви ----------

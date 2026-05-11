@@ -6,7 +6,7 @@
 """
 
 from typing import Optional
-from config import TABLE_FORMAT_THRESHOLD, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT
+from shared.config import TABLE_FORMAT_THRESHOLD, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT
 
 
 def strip_empty(obj: dict) -> dict:

@@ -13,7 +13,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 from shared.auth import get_credentials
-from config import CACHE_TTL_SECONDS
+from shared.config import CACHE_TTL_SECONDS
 
 
 # MIME для експорту Google Docs у docx-байти

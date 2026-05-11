@@ -8,7 +8,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from drive_client import download_file
-from config import FILE_IDS, SCAN_BUG_DESC_TRUNCATE
+from projects.worqen.config import FILE_IDS, SCAN_BUG_DESC_TRUNCATE
 
 
 BUG_SHEET = "Bug"

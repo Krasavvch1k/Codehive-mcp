@@ -25,7 +25,7 @@ from drive_client import (
     fetch_current_drive_modified,
     clear_cache,
 )
-from config import (
+from projects.worqen.config import (
     FILE_IDS,
     XLSX_MIME,
     BUG_EDITABLE_FIELDS,

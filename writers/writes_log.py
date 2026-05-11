@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from config import PROJECT_DIR
+from shared.config import PROJECT_DIR
 
 
 LOG_DIR = os.path.join(PROJECT_DIR, "writes_log")

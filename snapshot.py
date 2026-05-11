@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
-from config import SNAPSHOT_DIR, SNAPSHOT_RETENTION_DAYS
+from shared.config import SNAPSHOT_DIR, SNAPSHOT_RETENTION_DAYS
 
 
 def _ensure_dir():

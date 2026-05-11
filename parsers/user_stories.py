@@ -8,7 +8,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from drive_client import download_file
-from config import FILE_IDS, SCAN_TITLE_TRUNCATE
+from projects.worqen.config import FILE_IDS, SCAN_TITLE_TRUNCATE
 
 
 SHEET_NAME = "User Stories"
