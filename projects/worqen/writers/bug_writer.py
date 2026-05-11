@@ -40,12 +40,12 @@ from projects.worqen.parsers.bug_report import (
     is_bug_id_free,
     is_valid_bug_id_format,
 )
-from writers.safety import (
+from projects.worqen.safety import (
     SafetyError,
     check_drive_unchanged,
     ensure_today_snapshot,
 )
-from writers.writes_log import log_write
+from shared.writes_log import log_write
 
 
 HEADER_ROW = 2

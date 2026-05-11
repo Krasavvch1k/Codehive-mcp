@@ -29,8 +29,8 @@ from drive_client import (
     is_drive_newer,
 )
 from response_utils import strip_empty, format_list_response
-from writers.safety import SafetyError
-from writers.writes_log import read_today_log, read_log_by_date, filter_log
+from projects.worqen.safety import SafetyError
+from shared.writes_log import read_today_log, read_log_by_date, filter_log
 
 
 # Список ключів doc-документів для enum-полів у tools.

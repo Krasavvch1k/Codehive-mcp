@@ -1,5 +1,8 @@
 """
 Журнал успішних записів через writers.
+
+Generic — не містить worqen/codehive-specific логіки. Логує тільки те,
+що writer передав: tool, record_id, file_key, fields_changed, etc.
 """
 
 import json

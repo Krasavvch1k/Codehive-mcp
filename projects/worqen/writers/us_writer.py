@@ -40,7 +40,7 @@ from projects.worqen.parsers.user_stories import (
     is_us_id_free,
     is_valid_us_id_format,
 )
-from writers.safety import (
+from projects.worqen.safety import (
     SafetyError,
     check_drive_unchanged,
     ensure_today_snapshot,

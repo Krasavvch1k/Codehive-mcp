@@ -1,22 +1,17 @@
 """
-Safety layer для writer'ів.
+Safety layer — generic частина (project-agnostic).
 
-Викликається перед КОЖНИМ записом. Робить:
-1. Drive sync check — порівнює modifiedTime у Drive з тим що ми
-   бачили на момент початку операції. Якщо змінився — стоп.
-2. Auto snapshot — викликає save_today_snapshot() якщо сьогодні
-   ще не було знімка.
+Містить лише ті перевірки, що не залежать від конкретного проєкту:
+- SafetyError — типизована помилка
+- check_drive_unchanged — порівняння modifiedTime з baseline
 
-Якщо щось з перевірок не пройшло — піднімається SafetyError.
-Writer ловить її і повертає у MCP-відповідь.
+Project-specific safety (наприклад auto-snapshot для worqen) живе у
+projects/<name>/safety.py і може re-exportувати символи з цього модуля.
 """
 
-import os
-from datetime import datetime
 from typing import Optional
 
 from drive_client import fetch_current_drive_modified
-from shared.config import SNAPSHOT_DIR
 
 
 class SafetyError(Exception):
@@ -54,24 +49,3 @@ def check_drive_unchanged(file_id: str, baseline_modified: Optional[str]) -> str
             kind="drive_changed",
         )
     return current
-
-
-def ensure_today_snapshot() -> dict:
-    """
-    Якщо сьогоднішнього снепшоту ще немає — створює.
-    Якщо вже є — нічого не робить.
-
-    Повертає {"created": bool, "path": str | None}.
-    """
-    today = datetime.now().strftime("%Y-%m-%d")
-    today_path = os.path.join(SNAPSHOT_DIR, f"{today}.json")
-
-    if os.path.exists(today_path):
-        return {"created": False, "path": today_path}
-
-    # Імпорт всередині функції щоб уникнути циклу
-    # (analytics.py імпортує parsers, parsers поки що не імпортує writers,
-    # але краще перестрахуватись).
-    from parsers import analytics
-    path = analytics.save_today_snapshot()
-    return {"created": True, "path": path}
