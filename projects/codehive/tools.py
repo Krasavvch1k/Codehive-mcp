@@ -7,6 +7,7 @@ from mcp.types import Tool
 from projects.codehive import gdoc_reader
 from projects.codehive.writers import replace_text as replace_text_writer
 from projects.codehive.writers import insert_text as insert_text_writer
+from projects.codehive.writers import create_doc as create_doc_writer
 
 
 CODEHIVE_TOOLS: list[Tool] = [
@@ -156,6 +157,37 @@ CODEHIVE_TOOLS: list[Tool] = [
             "required": ["query", "text", "mode"],
         },
     ),
+    Tool(
+        name="codehive_create_doc",
+        description=(
+            "Create a new Google Doc inside a CodeHive Agency folder. "
+            "folder_query: full Drive ID or partial name (case-insensitive substring) of the target folder. "
+            "If more than one folder matches the query, returns an error with candidate list. "
+            "If a gdoc with the same name already exists in the target folder, returns an error (no creation). "
+            "initial_content is optional plain text inserted at document end after creation. "
+            "Returns file_id, url, and folder info. "
+            "CONFIRM-FLOW: before calling, show the user where the doc will be created and what name/content. "
+            "No preview mode — calling creates the doc immediately."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the new document.",
+                },
+                "folder_query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of the target folder (must resolve to exactly one).",
+                },
+                "initial_content": {
+                    "type": "string",
+                    "description": "Optional plain text to insert into the document body. Default: empty document.",
+                },
+            },
+            "required": ["name", "folder_query"],
+        },
+    ),
 ]
 
 
@@ -194,6 +226,13 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             mode=args["mode"],
             anchor=args.get("anchor"),
             as_paragraph=args.get("as_paragraph", False),
+        )
+
+    if name == "codehive_create_doc":
+        return create_doc_writer.create_doc(
+            name=args["name"],
+            folder_query=args["folder_query"],
+            initial_content=args.get("initial_content", ""),
         )
 
     return None
