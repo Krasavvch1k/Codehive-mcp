@@ -11,7 +11,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 
 # Scopes — що ми хочемо могти робити
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/documents",
+]
 
 
 def get_credentials():

@@ -5,7 +5,7 @@ from typing import Optional
 from shared.drive_client import (
     _list_folder_children,
     download_file,
-    _get_service,
+    get_service,
 )
 from projects.codehive.config import (
     CODEHIVE_ROOT_FOLDER_ID,
@@ -64,7 +64,7 @@ def _normalize_item(item: dict, parent_id: str, parent_name: Optional[str]) -> d
 def list_folder(folder_id: Optional[str] = None) -> dict:
     fid = _resolve_root(folder_id)
 
-    service = _get_service()
+    service = get_service()
     try:
         folder_meta = service.files().get(
             fileId=fid,
@@ -113,7 +113,7 @@ def list_folder(folder_id: Optional[str] = None) -> dict:
 
 def list_all_docs(max_depth: int = CODEHIVE_MAX_RECURSION_DEPTH) -> dict:
     root_id = _resolve_root(None)
-    service = _get_service()
+    service = get_service()
     try:
         root_meta = service.files().get(
             fileId=root_id,
@@ -168,7 +168,7 @@ def list_all_docs(max_depth: int = CODEHIVE_MAX_RECURSION_DEPTH) -> dict:
     }
 
 
-def _resolve_doc(query: str, all_docs: list[dict]) -> dict:
+def resolve_doc(query: str, all_docs: list[dict]) -> dict:
     q = query.strip()
 
     if len(q) > 25 and " " not in q and "(" not in q:
@@ -203,7 +203,7 @@ def read_doc(query: str) -> dict:
     all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
     gdocs = [d for d in all_data["items"] if d["kind"] == "gdoc"]
 
-    doc_meta = _resolve_doc(query, gdocs)
+    doc_meta = resolve_doc(query, gdocs)
 
     content = download_file(doc_meta["id"], fmt="gdoc")
     text = docx_bytes_to_markdown(content)

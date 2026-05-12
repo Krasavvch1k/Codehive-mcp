@@ -72,6 +72,53 @@ def log_write(
         pass
 
 
+def log_doc_write(
+    project: str,
+    tool: str,
+    file_id: str,
+    file_name: str,
+    payload: dict,
+) -> None:
+    """Лог запису у Google Doc (через Docs API).
+
+    Generic для будь-якого проєкту (codehive/worqen). На відміну від log_write
+    (xlsx-orientованого), сюди йде довільний payload.
+
+    Зберігає у тому ж logs/ dir, у тому ж JSON-форматі що log_write,
+    щоб фільтр і читання працювали уніфіковано.
+    """
+    try:
+        _ensure_log_dir()
+        today = datetime.now().strftime("%Y-%m-%d")
+        path = _log_path_for_date(today)
+
+        entry = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "tool": tool,
+            "project": project,
+            "id": file_id,
+            "file_name": file_name,
+            "payload": payload,
+        }
+
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    log = json.load(f)
+                if not isinstance(log, list):
+                    log = []
+            except json.JSONDecodeError:
+                log = []
+        else:
+            log = []
+
+        log.append(entry)
+        with open(path, "w") as f:
+            json.dump(log, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
 def read_log_by_date(date_str: str) -> list:
     path = _log_path_for_date(date_str)
     if not os.path.exists(path):

@@ -26,13 +26,13 @@ _GDOC_EXPORT_MIME = (
 _cache: dict[tuple[str, str], tuple[bytes, float, Optional[str]]] = {}
 
 
-def _get_service():
+def get_service():
     creds = get_credentials()
     return build("drive", "v3", credentials=creds)
 
 
 def get_file_metadata(file_id: str) -> dict:
-    service = _get_service()
+    service = get_service()
     return (
         service.files()
         .get(
@@ -64,7 +64,7 @@ def download_file(
         if now - cached_at < CACHE_TTL_SECONDS:
             return content
 
-    service = _get_service()
+    service = get_service()
 
     # Беремо метадані щоб зберегти modifiedTime у кеші
     meta = get_file_metadata(file_id)
@@ -163,7 +163,7 @@ def _list_folder_children(
     if cached and now - cached[1] < CACHE_TTL_SECONDS:
         return cached[0]
 
-    service = _get_service()
+    service = get_service()
 
     q_parts = [f"'{folder_id}' in parents", "trashed = false"]
     if only_mime:
@@ -280,7 +280,7 @@ def upload_file_content(
     """
     from googleapiclient.http import MediaIoBaseUpload
 
-    service = _get_service()
+    service = get_service()
 
     media = MediaIoBaseUpload(
         io.BytesIO(content_bytes),

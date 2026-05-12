@@ -19,3 +19,10 @@ GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
 GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
 GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder"
+
+# Write blacklist — за дефолтом все можна. Розширюй коли треба.
+# Спрацьовує: file_id у списку, OR назва містить substring (case-insensitive),
+# OR parent folder у списку.
+WRITE_BLACKLIST_FILE_IDS: list[str] = []
+WRITE_BLACKLIST_NAME_SUBSTRINGS: list[str] = []
+WRITE_BLACKLIST_FOLDERS: list[str] = []

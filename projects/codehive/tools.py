@@ -5,6 +5,7 @@ from typing import Optional
 from mcp.types import Tool
 
 from projects.codehive import gdoc_reader
+from projects.codehive.writers import replace_text as replace_text_writer
 
 
 CODEHIVE_TOOLS: list[Tool] = [
@@ -85,6 +86,35 @@ CODEHIVE_TOOLS: list[Tool] = [
             "required": ["query"],
         },
     ),
+    Tool(
+        name="codehive_replace_text",
+        description=(
+            "Replace exactly one occurrence of old_text with new_text in a CodeHive Agency gdoc. "
+            "Case-sensitive substring match. If 0 or >1 occurrences found — returns error with "
+            "contexts (no write). Uses optimistic locking via revisionId — if document changed "
+            "between read and write, returns error. "
+            "CONFIRM-FLOW: before calling this tool, show the user what will be replaced and wait "
+            "for explicit confirmation in chat. This tool has no preview mode — calling it writes immediately."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gdoc.",
+                },
+                "old_text": {
+                    "type": "string",
+                    "description": "Exact text to find (case-sensitive). Must occur exactly once in the document.",
+                },
+                "new_text": {
+                    "type": "string",
+                    "description": "Replacement text.",
+                },
+            },
+            "required": ["query", "old_text", "new_text"],
+        },
+    ),
 ]
 
 
@@ -107,6 +137,13 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             scope=args.get("scope", "names"),
             limit=args.get("limit", 20),
             context_chars=args.get("context_chars", 200),
+        )
+
+    if name == "codehive_replace_text":
+        return replace_text_writer.replace_text(
+            query=args["query"],
+            old_text=args["old_text"],
+            new_text=args["new_text"],
         )
 
     return None
