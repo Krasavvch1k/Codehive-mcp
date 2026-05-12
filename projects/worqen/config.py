@@ -139,3 +139,14 @@ BUG_ALL_FIELDS = [
 XLSX_MIME = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+
+
+# ---------------------------------------------------------------------------
+# Write safety (gdocs)
+# ---------------------------------------------------------------------------
+# Blacklist policy: empty by default ("everything is allowed").
+# Populate to forbid writes to specific docs / names / folders.
+
+WRITE_BLACKLIST_FILE_IDS: list[str] = []
+WRITE_BLACKLIST_NAME_SUBSTRINGS: list[str] = []
+WRITE_BLACKLIST_FOLDERS: list[str] = []
