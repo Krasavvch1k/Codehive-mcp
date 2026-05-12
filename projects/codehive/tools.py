@@ -6,6 +6,7 @@ from mcp.types import Tool
 
 from projects.codehive import gdoc_reader
 from projects.codehive.writers import replace_text as replace_text_writer
+from projects.codehive.writers import insert_text as insert_text_writer
 
 
 CODEHIVE_TOOLS: list[Tool] = [
@@ -115,6 +116,46 @@ CODEHIVE_TOOLS: list[Tool] = [
             "required": ["query", "old_text", "new_text"],
         },
     ),
+    Tool(
+        name="codehive_insert_text",
+        description=(
+            "Insert text into a CodeHive Agency gdoc in one of three modes: "
+            "'after' (right after anchor substring), 'before' (right before anchor), "
+            "or 'end_of_doc' (at the end of body, anchor must be None). "
+            "Anchor is case-sensitive and must occur exactly once. "
+            "as_paragraph=true wraps text with newlines so it becomes a separate paragraph. "
+            "Uses optimistic locking via revisionId. "
+            "CONFIRM-FLOW: before calling, show the user what will be inserted where and wait for "
+            "explicit confirmation in chat. No preview mode — calling writes immediately."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gdoc.",
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Text to insert. Verbatim by default; use as_paragraph=true to wrap in newlines.",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["after", "before", "end_of_doc"],
+                    "description": "Where to insert relative to anchor (or document end).",
+                },
+                "anchor": {
+                    "type": "string",
+                    "description": "Substring to find (case-sensitive, must be unique). Required for after/before, must be omitted for end_of_doc.",
+                },
+                "as_paragraph": {
+                    "type": "boolean",
+                    "description": "Wrap text in newlines so it becomes a separate paragraph. Default false.",
+                },
+            },
+            "required": ["query", "text", "mode"],
+        },
+    ),
 ]
 
 
@@ -144,6 +185,15 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             query=args["query"],
             old_text=args["old_text"],
             new_text=args["new_text"],
+        )
+
+    if name == "codehive_insert_text":
+        return insert_text_writer.insert_text(
+            query=args["query"],
+            text=args["text"],
+            mode=args["mode"],
+            anchor=args.get("anchor"),
+            as_paragraph=args.get("as_paragraph", False),
         )
 
     return None
