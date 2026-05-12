@@ -19,6 +19,7 @@ import uvicorn
 
 from projects.worqen.tools import WORQEN_TOOLS, worqen_dispatch
 from projects.codehive.tools import CODEHIVE_TOOLS, dispatch as codehive_dispatch
+from projects.worqen_api.tools import WORQEN_API_TOOLS, dispatch as worqen_api_dispatch
 
 
 server = Server("codehive-mcp")
@@ -31,7 +32,7 @@ def _format_response(data) -> list[TextContent]:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return WORQEN_TOOLS + CODEHIVE_TOOLS
+    return WORQEN_TOOLS + CODEHIVE_TOOLS + WORQEN_API_TOOLS
 
 
 @server.call_tool()
@@ -43,10 +44,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if worqen_result is not None:
             return worqen_result
 
-        # Codehive tools (4) — диспатчер повертає dict, сервер форматує
+        # Codehive tools — диспатчер повертає dict, сервер форматує
         codehive_result = codehive_dispatch(name, args)
         if codehive_result is not None:
             return _format_response(codehive_result)
+
+        # Worqen API tools (2) — read-only inspector of dev.api.worqen.com OpenAPI
+        worqen_api_result = worqen_api_dispatch(name, args)
+        if worqen_api_result is not None:
+            return _format_response(worqen_api_result)
 
         return _format_response({"error": f"Невідомий tool: {name}"})
 
@@ -93,8 +99,9 @@ if __name__ == "__main__":
     print("CodeHive MCP Server v2.2: http://127.0.0.1:8765")
     print("Endpoint:                 http://127.0.0.1:8765/mcp")
     print("=" * 60)
-    print(f"Tools: {len(WORQEN_TOOLS) + len(CODEHIVE_TOOLS)} "
-          f"({len(WORQEN_TOOLS)} worqen_* + {len(CODEHIVE_TOOLS)} codehive_*)")
+    print(f"Tools: {len(WORQEN_TOOLS) + len(CODEHIVE_TOOLS) + len(WORQEN_API_TOOLS)} "
+          f"({len(WORQEN_TOOLS)} worqen_* + {len(CODEHIVE_TOOLS)} codehive_* "
+          f"+ {len(WORQEN_API_TOOLS)} worqen_api_*)")
     print("Cache TTL: 30s")
     print("=" * 60)
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="info")
