@@ -31,7 +31,7 @@ FILE_FORMATS = {
     "tech_doc":      "docx",
     "prd_bootstrap": "docx",
     "prd_v1_1":      "docx",
-    "prd_v2":        "gdoc",
+    "prd_v2":        "docx",
     "aml_policy":    "docx",
     "tos":           "docx",
     "privacy":       "docx",
