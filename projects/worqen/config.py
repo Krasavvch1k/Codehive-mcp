@@ -150,3 +150,27 @@ XLSX_MIME = (
 WRITE_BLACKLIST_FILE_IDS: list[str] = []
 WRITE_BLACKLIST_NAME_SUBSTRINGS: list[str] = []
 WRITE_BLACKLIST_FOLDERS: list[str] = []
+
+
+# ---------------------------------------------------------------------------
+# Worqen Workspace (ws_*) — динамічне виявлення і читання файлів у Drive
+# ---------------------------------------------------------------------------
+#
+# Корінь воркспейсу — Shared Drive "Worqen". ID береться з .env
+# (WORQEN_ROOT_FOLDER_ID), щоб не хардкодити секрети у git.
+#
+# Pinned-файли (з FILE_IDS вище) ВИДНІ у ws-listings і читаються через ws_read_*,
+# але писати у них через ws-write tools заборонено — для них є worqen_* writers
+# з whitelist (US/BUG) або codehive_*/майбутні ws_write для гнучких документів.
+
+WORQEN_ROOT_FOLDER_ID = os.getenv("WORQEN_ROOT_FOLDER_ID", "")
+
+WS_DEFAULT_LIST_LIMIT = 100
+WS_MAX_LIST_LIMIT = 500
+WS_MAX_RECURSION_DEPTH = 3
+
+# Google MIME-константи (використовуються у класифікації типів файлів)
+GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
+GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
+GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
+GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder"

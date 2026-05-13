@@ -1,8 +1,9 @@
 """
 MCP-сервер CodeHive (Streamable HTTP).
 
-Тонкий transport-shell: реєструє WORQEN_TOOLS + CODEHIVE_TOOLS, диспатчить
-виклики у відповідні проєкти. Вся бізнес-логіка живе у projects/<name>/tools.py.
+Тонкий transport-shell: реєструє WORQEN_TOOLS + WORQEN_WS_TOOLS + CODEHIVE_TOOLS
++ WORQEN_API_TOOLS, диспатчить виклики у відповідні проєкти. Вся бізнес-логіка
+живе у projects/<name>/(tools.py | ws_tools.py).
 """
 
 import contextlib
@@ -18,6 +19,7 @@ from starlette.types import Receive, Scope, Send
 import uvicorn
 
 from projects.worqen.tools import WORQEN_TOOLS, worqen_dispatch
+from projects.worqen.ws_tools import WORQEN_WS_TOOLS, ws_dispatch as worqen_ws_dispatch
 from projects.codehive.tools import CODEHIVE_TOOLS, dispatch as codehive_dispatch
 from projects.worqen_api.tools import WORQEN_API_TOOLS, dispatch as worqen_api_dispatch
 
@@ -32,24 +34,29 @@ def _format_response(data) -> list[TextContent]:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return WORQEN_TOOLS + CODEHIVE_TOOLS + WORQEN_API_TOOLS
+    return WORQEN_TOOLS + WORQEN_WS_TOOLS + CODEHIVE_TOOLS + WORQEN_API_TOOLS
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     args = arguments or {}
     try:
-        # Worqen tools (33) — диспатчер сам форматує відповідь через _format_response
+        # Worqen tools — диспатчер сам форматує відповідь через _format_response
         worqen_result = worqen_dispatch(name, args, _format_response)
         if worqen_result is not None:
             return worqen_result
+
+        # Worqen workspace tools (ws_*) — диспатчер повертає dict, сервер форматує
+        ws_result = worqen_ws_dispatch(name, args)
+        if ws_result is not None:
+            return _format_response(ws_result)
 
         # Codehive tools — диспатчер повертає dict, сервер форматує
         codehive_result = codehive_dispatch(name, args)
         if codehive_result is not None:
             return _format_response(codehive_result)
 
-        # Worqen API tools (2) — read-only inspector of dev.api.worqen.com OpenAPI
+        # Worqen API tools — read-only inspector of dev.api.worqen.com OpenAPI
         worqen_api_result = worqen_api_dispatch(name, args)
         if worqen_api_result is not None:
             return _format_response(worqen_api_result)
@@ -95,13 +102,19 @@ app = Starlette(
 
 
 if __name__ == "__main__":
+    total = (
+        len(WORQEN_TOOLS) + len(WORQEN_WS_TOOLS)
+        + len(CODEHIVE_TOOLS) + len(WORQEN_API_TOOLS)
+    )
     print("=" * 60)
-    print("CodeHive MCP Server v2.2: http://127.0.0.1:8765")
+    print("CodeHive MCP Server v2.3: http://127.0.0.1:8765")
     print("Endpoint:                 http://127.0.0.1:8765/mcp")
     print("=" * 60)
-    print(f"Tools: {len(WORQEN_TOOLS) + len(CODEHIVE_TOOLS) + len(WORQEN_API_TOOLS)} "
-          f"({len(WORQEN_TOOLS)} worqen_* + {len(CODEHIVE_TOOLS)} codehive_* "
-          f"+ {len(WORQEN_API_TOOLS)} worqen_api_*)")
+    print(
+        f"Tools: {total} "
+        f"({len(WORQEN_TOOLS)} worqen_* + {len(WORQEN_WS_TOOLS)} worqen_ws_* "
+        f"+ {len(CODEHIVE_TOOLS)} codehive_* + {len(WORQEN_API_TOOLS)} worqen_api_*)"
+    )
     print("Cache TTL: 30s")
     print("=" * 60)
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="info")
