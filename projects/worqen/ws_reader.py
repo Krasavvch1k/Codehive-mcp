@@ -220,53 +220,186 @@ def list_all(
 # ---------------------------------------------------------------------------
 
 
-def resolve(query: str, candidates: Optional[list[dict]] = None) -> dict:
+def _looks_like_drive_id(s: str) -> bool:
+    """Heuristic: довге, без пробілів, без дужок — ймовірно Drive ID."""
+    return len(s) > 25 and " " not in s and "(" not in s
+
+
+def _format_wrong_kind_error(
+    query: str,
+    found_items: list[dict],
+    kind_filter: tuple[str, ...],
+) -> str:
+    """Готує читабельну помилку для випадку 'знайдено, але не той тип'."""
+    previews = []
+    for it in found_items[:5]:
+        previews.append(
+            f"{it['name']} (kind={it['kind']}, id: {it['id'][:12]}...)"
+        )
+    more = f", ...{len(found_items) - 5} more" if len(found_items) > 5 else ""
+    expected = "/".join(kind_filter)
+    return (
+        f"Query '{query}' матчить {len(found_items)} файл(и), "
+        f"але жоден не {expected}. Знайдено: {'; '.join(previews)}{more}. "
+        f"Можливо ти хотів інший tool для цього типу."
+    )
+
+
+def _resolve_via_drive_search(
+    query: str,
+    kind_filter: Optional[tuple[str, ...]] = None,
+) -> dict:
     """
-    Знаходить файл/папку за query серед candidates.
+    Знаходить файл через нативний Drive search (один API call),
+    незалежно від глибини у дереві.
+
+    kind_filter: якщо передано — повертаємо тільки файли з kind у цьому tuple.
+        Файли іншого типу повідомляються в окремій помилці.
+
+    Якщо знайдено 1 — повертає normalized item з реконструйованим path.
+    0 / >1 / wrong-kind — підіймає ValueError з деталями.
+    """
+    from shared.drive_client import (
+        build_path_for_file,
+        get_file_metadata,
+        search_files_by_name,
+    )
+
+    root_id = _resolve_root(None)
+    root_name = _get_folder_name(root_id)
+
+    # Оптимізація: якщо kind_filter тільки "folder" — фільтруємо одразу у Drive query
+    mime_pre_filter: Optional[str] = None
+    if kind_filter == ("folder",):
+        mime_pre_filter = GOOGLE_FOLDER_MIME
+
+    # ID-стиль — спершу пробуємо як точний id
+    if _looks_like_drive_id(query):
+        try:
+            meta = get_file_metadata(query)
+            if meta.get("id"):
+                normalized = _normalize_item(meta, parent_id="", parent_name=None)
+                if kind_filter and normalized["kind"] not in kind_filter:
+                    raise ValueError(
+                        _format_wrong_kind_error(query, [normalized], kind_filter)
+                    )
+                path = build_path_for_file(meta["id"], root_id, root_name)
+                if path:
+                    normalized["path"] = path
+                normalized["depth"] = path.count(" > ") if path else 0
+                return normalized
+        except ValueError:
+            raise
+        except Exception:
+            pass  # не валідний id або немає доступу — падаємо у name search
+
+    # Substring у назві — нативний Drive search
+    raw_results = search_files_by_name(
+        query, drive_id=root_id, mime_type=mime_pre_filter
+    )
+
+    # case-insensitive substring у Drive API не строго consistent —
+    # додатково фільтруємо локально
+    q_lower = query.lower()
+    raw_results = [r for r in raw_results if q_lower in r.get("name", "").lower()]
+
+    if not raw_results:
+        raise ValueError(
+            f"Нічого не знайдено для query='{query}' у Worqen Drive. "
+            f"Спробуй worqen_ws_list_all з більшим max_depth щоб побачити дерево."
+        )
+
+    # Нормалізуємо всі результати
+    normalized_all = [
+        _normalize_item(r, parent_id="", parent_name=None) for r in raw_results
+    ]
+
+    # Якщо є kind_filter — фільтруємо
+    if kind_filter:
+        matched = [n for n in normalized_all if n["kind"] in kind_filter]
+        if not matched:
+            raise ValueError(
+                _format_wrong_kind_error(query, normalized_all, kind_filter)
+            )
+        normalized_all = matched
+
+    if len(normalized_all) > 1:
+        previews = []
+        for n in normalized_all[:5]:
+            path = build_path_for_file(n["id"], root_id, root_name) or "?"
+            previews.append(f"{n['name']} [{path}] (id: {n['id'][:12]}...)")
+        more = f", ...{len(normalized_all) - 5} more" if len(normalized_all) > 5 else ""
+        raise ValueError(
+            f"Query '{query}' матчить {len(normalized_all)} елементів. "
+            f"Уточни запит. Кандидати: {'; '.join(previews)}{more}"
+        )
+
+    # Єдиний матч — додаємо path
+    found = normalized_all[0]
+    path = build_path_for_file(found["id"], root_id, root_name)
+    if path:
+        found["path"] = path
+    found["depth"] = path.count(" > ") if path else 0
+    return found
+
+
+def resolve(
+    query: str,
+    candidates: Optional[list[dict]] = None,
+    kind_filter: Optional[tuple[str, ...]] = None,
+) -> dict:
+    """
+    Знаходить файл/папку за query.
 
     query:
         - повний Drive ID (детектиться: довжина > 25, без пробілів/дужок) — точне співпадіння по id
         - інакше substring у name (case-insensitive)
 
-    Якщо candidates не передано — береться список усіх items з list_all() default depth.
+    Три режими:
+        1. candidates передано — пошук тільки серед них (legacy). Використовується
+           тими consumer-ами які вже мають готовий filtered список.
+        2. kind_filter передано без candidates — нативний Drive search з фільтром
+           по типу файла ("docx", "gdoc", "gsheet", "xlsx", "folder" тощо).
+        3. Нічого з двох — нативний Drive search без фільтра.
 
     Raises:
-        ValueError якщо нічого не знайдено або знайдено кілька.
+        ValueError якщо нічого не знайдено / знайдено кілька / wrong kind.
     """
-    if candidates is None:
-        candidates = list_all()["items"]
-
     q = query.strip()
     if not q:
         raise ValueError("query не може бути порожнім")
 
-    # ID-стиль: довге, без пробілів і дужок
-    if len(q) > 25 and " " not in q and "(" not in q:
-        for c in candidates:
-            if c["id"] == q:
-                return c
+    # Шлях 1: пошук у наданому списку
+    if candidates is not None:
+        if _looks_like_drive_id(q):
+            for c in candidates:
+                if c["id"] == q:
+                    return c
 
-    q_lower = q.lower()
-    matches = [c for c in candidates if q_lower in c["name"].lower()]
+        q_lower = q.lower()
+        matches = [c for c in candidates if q_lower in c["name"].lower()]
 
-    if not matches:
-        raise ValueError(
-            f"Нічого не знайдено для query='{query}' у Worqen воркспейсі. "
-            f"Спробуй worqen_ws_list_all щоб побачити доступні назви."
-        )
+        if not matches:
+            raise ValueError(
+                f"Нічого не знайдено для query='{query}' у Worqen воркспейсі. "
+                f"Спробуй worqen_ws_list_all щоб побачити доступні назви."
+            )
 
-    if len(matches) > 1:
-        names = [
-            f"{m['name']} [{m.get('path', '?')}] (id: {m['id'][:12]}...)"
-            for m in matches[:5]
-        ]
-        more = f", ...{len(matches) - 5} more" if len(matches) > 5 else ""
-        raise ValueError(
-            f"Query '{query}' матчить {len(matches)} елементів. "
-            f"Уточни запит. Кандидати: {'; '.join(names)}{more}"
-        )
+        if len(matches) > 1:
+            names = [
+                f"{m['name']} [{m.get('path', '?')}] (id: {m['id'][:12]}...)"
+                for m in matches[:5]
+            ]
+            more = f", ...{len(matches) - 5} more" if len(matches) > 5 else ""
+            raise ValueError(
+                f"Query '{query}' матчить {len(matches)} елементів. "
+                f"Уточни запит. Кандидати: {'; '.join(names)}{more}"
+            )
 
-    return matches[0]
+        return matches[0]
+
+    # Шлях 2 і 3: нативний Drive search (з kind_filter або без).
+    return _resolve_via_drive_search(q, kind_filter=kind_filter)
 
 
 # ---------------------------------------------------------------------------
@@ -284,9 +417,7 @@ def read_doc(query: str, force_refresh: bool = False) -> dict:
     Raises:
         ValueError якщо файл не знайдено або це не docx/gdoc.
     """
-    all_data = list_all()
-    candidates = [d for d in all_data["items"] if d["kind"] in ("docx", "gdoc")]
-    doc_meta = resolve(query, candidates)
+    doc_meta = resolve(query, kind_filter=("docx", "gdoc"))
 
     fmt = "gdoc" if doc_meta["kind"] == "gdoc" else "docx"
     content = download_file(doc_meta["id"], fmt=fmt, force_refresh=force_refresh)

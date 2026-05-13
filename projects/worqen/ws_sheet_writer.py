@@ -47,7 +47,7 @@ from projects.worqen.config import (
     XLSX_MIME,
 )
 from projects.worqen.safety import ensure_today_snapshot
-from projects.worqen.ws_reader import list_all, resolve
+from projects.worqen.ws_reader import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -91,17 +91,7 @@ def _check_blacklist(meta: dict) -> None:
 
 def _resolve_writable_sheet(query: str) -> dict:
     """Резолвить query до gsheet/xlsx + blacklist check."""
-    all_data = list_all()
-    candidates = [d for d in all_data["items"] if d["kind"] in _WRITABLE_SHEET_KINDS]
-    meta = resolve(query, candidates)
-
-    if meta["kind"] not in _WRITABLE_SHEET_KINDS:
-        raise ValueError(
-            f"Файл '{meta['name']}' має kind='{meta['kind']}', "
-            f"очікую один з {_WRITABLE_SHEET_KINDS}. "
-            f"Для docx/gdoc використовуй worqen_ws_replace_text / insert_text."
-        )
-
+    meta = resolve(query, kind_filter=_WRITABLE_SHEET_KINDS)
     _check_blacklist(meta)
     return meta
 

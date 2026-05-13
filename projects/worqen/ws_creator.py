@@ -44,7 +44,7 @@ from projects.worqen.config import (
     WRITE_BLACKLIST_FOLDERS,
     XLSX_MIME,
 )
-from projects.worqen.ws_reader import list_all, resolve
+from projects.worqen.ws_reader import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +83,7 @@ def _resolve_parent_folder(parent_folder: Optional[str]) -> tuple[str, str]:
             )
         return WORQEN_ROOT_FOLDER_ID, "Worqen"
 
-    all_data = list_all()
-    candidates = [d for d in all_data["items"] if d["kind"] == "folder"]
-    folder = resolve(parent_folder, candidates)
+    folder = resolve(parent_folder, kind_filter=("folder",))
 
     if folder["id"] in WRITE_BLACKLIST_FOLDERS:
         raise SafetyError(

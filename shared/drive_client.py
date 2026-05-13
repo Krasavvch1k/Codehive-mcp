@@ -314,3 +314,154 @@ def fetch_current_drive_modified(file_id: str) -> Optional[str]:
         return meta.get("modifiedTime")
     except Exception:
         return None
+# ====================== NATIVE DRIVE SEARCH ======================
+#
+# Пошук по імені через Drive API (один запит, незалежно від глибини).
+# Використовується для worqen_ws_resolve коли треба знайти файл за substring
+# без повного BFS-обходу дерева.
+
+
+def search_files_by_name(
+    name_substring: str,
+    drive_id: str,
+    mime_type: Optional[str] = None,
+    page_size: int = 100,
+) -> list[dict]:
+    """
+    Знаходить файли по substring у назві через Drive API.
+    Один API call, без рекурсії — працює незалежно від глибини файла.
+
+    name_substring: підрядок (case-insensitive у Drive API).
+    drive_id: ID Shared Drive (corpora=drive).
+    mime_type: опційний фільтр по точному mimeType (для оптимізації).
+    page_size: ліміт першої сторінки (за замовчуванням 100, достатньо для UX).
+
+    Returns: список raw items з полями id, name, mimeType, parents, modifiedTime, size.
+    """
+    service = get_service()
+
+    # Екрануємо одинарні лапки у substring (Drive query syntax)
+    escaped = name_substring.replace("'", "\\'")
+    q_parts = [f"name contains '{escaped}'", "trashed = false"]
+    if mime_type:
+        q_parts.append(f"mimeType = '{mime_type}'")
+    q = " and ".join(q_parts)
+
+    response = (
+        service.files()
+        .list(
+            q=q,
+            corpora="drive",
+            driveId=drive_id,
+            includeItemsFromAllDrives=True,
+            supportsAllDrives=True,
+            fields=(
+                "files(id, name, mimeType, parents, modifiedTime, size)"
+            ),
+            pageSize=page_size,
+        )
+        .execute()
+    )
+    return response.get("files", [])
+
+
+# Кеш breadcrumb-шляхів: file_id -> (path_string, timestamp)
+_path_cache: dict[str, tuple[str, float]] = {}
+
+# Окремий кеш для назв папок при path-реконструкції
+# folder_id -> (name, parents_list, timestamp)
+_folder_meta_cache: dict[str, tuple[str, list[str], float]] = {}
+
+
+def _get_folder_meta_cached(folder_id: str) -> tuple[Optional[str], list[str]]:
+    """Повертає (name, parents) для папки з кешем TTL."""
+    now = time.time()
+    cached = _folder_meta_cache.get(folder_id)
+    if cached:
+        name, parents, ts = cached
+        if now - ts < CACHE_TTL_SECONDS:
+            return name, parents
+
+    service = get_service()
+    try:
+        meta = (
+            service.files()
+            .get(
+                fileId=folder_id,
+                fields="id, name, parents",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+        name = meta.get("name")
+        parents = meta.get("parents", []) or []
+    except Exception:
+        name, parents = None, []
+
+    _folder_meta_cache[folder_id] = (name or "", parents, now)
+    return name, parents
+
+
+def build_path_for_file(
+    file_id: str,
+    root_id: str,
+    root_name: Optional[str] = None,
+    max_steps: int = 20,
+) -> str:
+    """
+    Реконструює breadcrumb шлях від root_id до file_id через parents.
+    Формат: "Root > Folder > Subfolder > File".
+
+    Якщо file_id не у дереві root_id (немає шляху вгору до root) —
+    повертає шлях без префікса root.
+    max_steps: захист від циклів і надто глибокого дерева.
+
+    Кешує результат на TTL.
+    """
+    now = time.time()
+    cached = _path_cache.get(file_id)
+    if cached and now - cached[1] < CACHE_TTL_SECONDS:
+        return cached[0]
+
+    service = get_service()
+
+    # Метадані самого файла
+    try:
+        meta = (
+            service.files()
+            .get(
+                fileId=file_id,
+                fields="id, name, parents",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+    except Exception:
+        return ""
+
+    file_name = meta.get("name", "")
+    parents = meta.get("parents", []) or []
+
+    # Йдемо вгору по першому батьку
+    breadcrumbs: list[str] = [file_name]
+    cur_parent_id: Optional[str] = parents[0] if parents else None
+    steps = 0
+    reached_root = False
+
+    while cur_parent_id and steps < max_steps:
+        if cur_parent_id == root_id:
+            reached_root = True
+            break
+        p_name, p_parents = _get_folder_meta_cached(cur_parent_id)
+        if not p_name:
+            break
+        breadcrumbs.append(p_name)
+        cur_parent_id = p_parents[0] if p_parents else None
+        steps += 1
+
+    if reached_root and root_name:
+        breadcrumbs.append(root_name)
+
+    path = " > ".join(reversed(breadcrumbs))
+    _path_cache[file_id] = (path, now)
+    return path

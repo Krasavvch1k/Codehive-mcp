@@ -37,7 +37,7 @@ from projects.worqen.config import (
     WRITE_BLACKLIST_FOLDERS,
     WRITE_BLACKLIST_NAME_SUBSTRINGS,
 )
-from projects.worqen.ws_reader import list_all, resolve
+from projects.worqen.ws_reader import resolve
 
 logger = logging.getLogger(__name__)
 
@@ -97,19 +97,7 @@ def _resolve_writable_doc(query: str) -> dict:
         SafetyError якщо blacklisted.
         ValueError якщо не знайдено / ambiguous / це не doc-тип.
     """
-    all_data = list_all()
-    candidates = [
-        d for d in all_data["items"] if d["kind"] in _WRITABLE_DOC_KINDS
-    ]
-    doc_meta = resolve(query, candidates)
-
-    if doc_meta["kind"] not in _WRITABLE_DOC_KINDS:
-        raise ValueError(
-            f"Файл '{doc_meta['name']}' має kind='{doc_meta['kind']}', "
-            f"очікую один з {_WRITABLE_DOC_KINDS}. "
-            f"Для sheets використовуй worqen_ws_update_cell / update_range / append_row."
-        )
-
+    doc_meta = resolve(query, kind_filter=_WRITABLE_DOC_KINDS)
     _check_blacklist(doc_meta)
     return doc_meta
 

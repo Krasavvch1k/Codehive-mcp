@@ -13,7 +13,7 @@ from typing import Optional
 
 from openpyxl import load_workbook
 
-from projects.worqen.ws_reader import list_all, resolve
+from projects.worqen.ws_reader import resolve
 from shared.drive_client import download_file
 from shared.sheets_client import get_sheet_values, get_spreadsheet_meta
 
@@ -293,9 +293,7 @@ def read_sheet(
     limit_rows = max(1, min(limit_rows, MAX_LIMIT_ROWS))
     limit_cols = max(1, min(limit_cols, MAX_LIMIT_COLS))
 
-    all_data = list_all()
-    candidates = [d for d in all_data["items"] if d["kind"] in ("gsheet", "xlsx")]
-    meta = resolve(query, candidates)
+    meta = resolve(query, kind_filter=("gsheet", "xlsx"))
 
     common_meta = {
         "name": meta["name"],
