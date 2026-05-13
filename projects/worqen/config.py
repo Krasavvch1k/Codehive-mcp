@@ -147,7 +147,7 @@ XLSX_MIME = (
 # Blacklist policy: empty by default ("everything is allowed").
 # Populate to forbid writes to specific docs / names / folders.
 
-WRITE_BLACKLIST_FILE_IDS: list[str] = []
+WRITE_BLACKLIST_FILE_IDS: list[str] = [FILE_IDS["user_stories"], FILE_IDS["qa_report"]]
 WRITE_BLACKLIST_NAME_SUBSTRINGS: list[str] = []
 WRITE_BLACKLIST_FOLDERS: list[str] = []
 
