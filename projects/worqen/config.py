@@ -5,6 +5,10 @@ Drive файли, поля US/BUG, тригери для detect_conflicts, те�
 """
 
 import os
+from dotenv import load_dotenv
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(_ROOT, ".env"))
 
 # ----- Drive файли -----
 #
