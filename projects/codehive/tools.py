@@ -67,6 +67,26 @@ CODEHIVE_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="codehive_read_file",
+        description=(
+            "Read a non-Office file from CodeHive Agency as text. "
+            ".md / .txt -> raw content as-is (no markdown render). "
+            ".pdf -> extracted text layer (no OCR; scanned PDFs error out). "
+            "For Google Docs use codehive_read_doc instead. "
+            "query: full Drive ID or partial name (case-insensitive substring)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a .md/.txt/.pdf file.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
         name="codehive_search",
         description=(
             "Search inside CodeHive Agency. "
@@ -203,6 +223,9 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
 
     if name == "codehive_read_doc":
         return gdoc_reader.read_doc(query=args["query"])
+
+    if name == "codehive_read_file":
+        return gdoc_reader.read_file(query=args["query"])
 
     if name == "codehive_search":
         return gdoc_reader.search(

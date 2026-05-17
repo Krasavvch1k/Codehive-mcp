@@ -116,6 +116,30 @@ WORQEN_WS_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="worqen_ws_read_file",
+        description=(
+            "Worqen workspace: читає НЕ-Office файл як текст. "
+            ".md / .txt → сирий вміст як є (без markdown-рендеру). "
+            ".pdf → витяг текстового шару (без OCR; скан/картинка дасть помилку). "
+            "Для docx/gdoc використовуй worqen_ws_read_doc, для gsheet/xlsx — "
+            "worqen_ws_read_sheet. force_refresh обходить 30с TTL-кеш."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Substring назви або повний Drive ID.",
+                },
+                "force_refresh": {
+                    "type": "boolean",
+                    "description": "True щоб обійти кеш. Default: false.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
         name="worqen_ws_read_sheet",
         description=(
             "Worqen workspace: читає gsheet або xlsx. Повертає всі аркуші (або один, "
@@ -495,6 +519,15 @@ def ws_dispatch(name: str, args: dict):
     if name == "worqen_ws_read_doc":
         try:
             return ws_reader.read_doc(
+                query=args["query"],
+                force_refresh=args.get("force_refresh", False),
+            )
+        except ValueError as e:
+            return {"error": str(e)}
+
+    if name == "worqen_ws_read_file":
+        try:
+            return ws_reader.read_file(
                 query=args["query"],
                 force_refresh=args.get("force_refresh", False),
             )

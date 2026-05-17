@@ -18,6 +18,7 @@ from shared.gdoc import (
     docx_bytes_to_plain_text,
     extract_snippet,
 )
+from shared.plaintext import decode_text_bytes
 
 
 def _resolve_root(folder_id: Optional[str]) -> str:
@@ -45,6 +46,10 @@ def _classify_item(item: dict) -> str:
         return "pdf"
     if mime.startswith("image/"):
         return "image"
+    if mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return "docx"
+    if mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        return "xlsx"
     return "other"
 
 
@@ -218,6 +223,40 @@ def read_doc(query: str) -> dict:
         "text": text,
     }
 
+
+
+def read_file(query: str) -> dict:
+    """
+    Read a non-Office file from CodeHive Agency as text.
+
+    .md / .txt (kind=other) -> raw content as-is (no markdown render).
+    .pdf -> extracted text layer via pypdf (no OCR; scans raise an error).
+
+    For gdoc use read_doc instead.
+
+    Raises:
+        ValueError if not found, ambiguous, or not a text/pdf file
+        (NotTextFileError subclasses ValueError).
+    """
+    all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
+    files = [d for d in all_data["items"] if d["kind"] in ("other", "pdf")]
+
+    doc_meta = resolve_doc(query, files)
+
+    fmt = "pdf" if doc_meta["kind"] == "pdf" else "md"
+    content = download_file(doc_meta["id"], fmt=fmt)
+    text = decode_text_bytes(content, doc_meta["kind"], doc_meta["name"])
+
+    return {
+        "id": doc_meta["id"],
+        "name": doc_meta["name"],
+        "mime": doc_meta["mime"],
+        "kind": doc_meta["kind"],
+        "path": doc_meta.get("path"),
+        "modified": doc_meta.get("modified"),
+        "length": len(text),
+        "text": text,
+    }
 
 def search(
     query: str,

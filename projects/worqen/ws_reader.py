@@ -23,6 +23,7 @@ from shared.gdoc import (
     docx_bytes_to_plain_text,
     extract_snippet,
 )
+from shared.plaintext import decode_text_bytes
 from projects.worqen.config import (
     GOOGLE_DOC_MIME,
     GOOGLE_FOLDER_MIME,
@@ -435,6 +436,45 @@ def read_doc(query: str, force_refresh: bool = False) -> dict:
         "text": text,
     }
 
+
+
+# ---------------------------------------------------------------------------
+# Public: read_file (md / txt / pdf — не-Office)
+# ---------------------------------------------------------------------------
+
+
+def read_file(query: str, force_refresh: bool = False) -> dict:
+    """
+    Читає НЕ-Office файл як текст: .md / .txt (kind=other) або .pdf.
+
+    Дзеркало read_doc, але для текстових/pdf файлів:
+    - .md / .txt → raw bytes декодуються як UTF-8 (як є, без markdown-рендеру)
+    - .pdf       → витяг текстового шару через pypdf (без OCR)
+
+    query: name substring або повний Drive ID.
+    force_refresh: True — обійти TTL-кеш drive_client (свіже з Drive).
+
+    Raises:
+        ValueError якщо файл не знайдено, або це не текст/pdf,
+        або тексту витягти не вдалось (NotTextFileError успадковує ValueError).
+    """
+    doc_meta = resolve(query, kind_filter=("other", "pdf"))
+
+    fmt = "pdf" if doc_meta["kind"] == "pdf" else "md"
+    content = download_file(doc_meta["id"], fmt=fmt, force_refresh=force_refresh)
+    text = decode_text_bytes(content, doc_meta["kind"], doc_meta["name"])
+
+    return {
+        "id": doc_meta["id"],
+        "name": doc_meta["name"],
+        "mime": doc_meta["mime"],
+        "kind": doc_meta["kind"],
+        "path": doc_meta.get("path"),
+        "modified": doc_meta.get("modified"),
+        "length": len(text),
+        "force_refresh": force_refresh,
+        "text": text,
+    }
 
 # ---------------------------------------------------------------------------
 # Public: force_refresh
