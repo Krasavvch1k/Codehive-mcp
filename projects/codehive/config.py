@@ -23,6 +23,11 @@ GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder"
 # Write blacklist — за дефолтом все можна. Розширюй коли треба.
 # Спрацьовує: file_id у списку, OR назва містить substring (case-insensitive),
 # OR parent folder у списку.
+XLSX_MIME = (
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+
 WRITE_BLACKLIST_FILE_IDS: list[str] = []
 WRITE_BLACKLIST_NAME_SUBSTRINGS: list[str] = []
 WRITE_BLACKLIST_FOLDERS: list[str] = []

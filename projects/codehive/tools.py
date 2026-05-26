@@ -6,6 +6,7 @@ from mcp.types import Tool
 
 from projects.codehive import gdoc_reader
 from projects.codehive import sheets_reader
+from projects.codehive import sheets_writer
 from projects.codehive.writers import replace_text as replace_text_writer
 from projects.codehive.writers import insert_text as insert_text_writer
 from projects.codehive.writers import create_doc as create_doc_writer
@@ -147,6 +148,49 @@ CODEHIVE_TOOLS: list[Tool] = [
                 },
             },
             "required": ["query"],
+        },
+    ),
+    Tool(
+        name="codehive_append_row",
+        description=(
+            "Append a single row to the end of a gsheet or xlsx in CodeHive Agency. "
+            "query: full Drive ID or partial name (case-insensitive substring); must resolve to exactly one gsheet/xlsx. "
+            "sheet: worksheet title (exact match). "
+            "values: 1D list (not 2D!) — one row of values. "
+            "copy_style_from_last: for xlsx — copy font/fill/border/alignment from the previous row. Default true. "
+            "dry_run=true returns preview without writing. "
+            "force_overwrite bypasses the drive-unchanged safety check (use only if the warning is a false positive). "
+            "CONFIRM-FLOW: before calling without dry_run, show the user where and what will be written."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gsheet or xlsx.",
+                },
+                "sheet": {
+                    "type": "string",
+                    "description": "Worksheet title (exact match).",
+                },
+                "values": {
+                    "type": "array",
+                    "description": "1D list of values for one row (not 2D).",
+                },
+                "copy_style_from_last": {
+                    "type": "boolean",
+                    "description": "For xlsx — copy style from previous row. Default true.",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Preview without writing. Default false.",
+                },
+                "force_overwrite": {
+                    "type": "boolean",
+                    "description": "Bypass drive-unchanged safety check. Default false.",
+                },
+            },
+            "required": ["query", "sheet", "values"],
         },
     ),
     Tool(
@@ -356,6 +400,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             limit_cols=args.get("limit_cols", 50),
             force_refresh=args.get("force_refresh", False),
             as_markdown=args.get("as_markdown", True),
+        )
+
+    if name == "codehive_append_row":
+        return sheets_writer.append_row(
+            query=args["query"],
+            sheet=args["sheet"],
+            values=args["values"],
+            copy_style_from_last=args.get("copy_style_from_last", True),
+            dry_run=args.get("dry_run", False),
+            force_overwrite=args.get("force_overwrite", False),
         )
 
     if name == "codehive_search":
