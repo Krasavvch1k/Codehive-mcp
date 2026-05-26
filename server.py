@@ -1,9 +1,9 @@
 """
 MCP-сервер CodeHive (Streamable HTTP).
 
-Тонкий transport-shell: реєструє WORQEN_TOOLS + WORQEN_WS_TOOLS + CODEHIVE_TOOLS
-+ WORQEN_API_TOOLS, диспатчить виклики у відповідні проєкти. Вся бізнес-логіка
-живе у projects/<name>/(tools.py | ws_tools.py).
+Тонкий transport-shell: проходить по PROJECTS реєстру, кожен MCP-проєкт
+сам відповідає за свої tools і dispatch. Вся бізнес-логіка живе у
+projects/<name>/(tools.py | ws_tools.py | ...).
 """
 
 import contextlib
@@ -18,10 +18,7 @@ from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 import uvicorn
 
-from projects.worqen.tools import WORQEN_TOOLS, worqen_dispatch
-from projects.worqen.ws_tools import WORQEN_WS_TOOLS, ws_dispatch as worqen_ws_dispatch
-from projects.codehive.tools import CODEHIVE_TOOLS, dispatch as codehive_dispatch
-from projects.worqen_api.tools import WORQEN_API_TOOLS, dispatch as worqen_api_dispatch
+from projects import PROJECTS
 
 
 server = Server("codehive-mcp")
@@ -34,32 +31,20 @@ def _format_response(data) -> list[TextContent]:
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return WORQEN_TOOLS + WORQEN_WS_TOOLS + CODEHIVE_TOOLS + WORQEN_API_TOOLS
+    result: list[Tool] = []
+    for project in PROJECTS:
+        result.extend(project.tools())
+    return result
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     args = arguments or {}
     try:
-        # Worqen tools — диспатчер сам форматує відповідь через _format_response
-        worqen_result = worqen_dispatch(name, args, _format_response)
-        if worqen_result is not None:
-            return worqen_result
-
-        # Worqen workspace tools (ws_*) — диспатчер повертає dict, сервер форматує
-        ws_result = worqen_ws_dispatch(name, args)
-        if ws_result is not None:
-            return _format_response(ws_result)
-
-        # Codehive tools — диспатчер повертає dict, сервер форматує
-        codehive_result = codehive_dispatch(name, args)
-        if codehive_result is not None:
-            return _format_response(codehive_result)
-
-        # Worqen API tools — read-only inspector of dev.api.worqen.com OpenAPI
-        worqen_api_result = worqen_api_dispatch(name, args)
-        if worqen_api_result is not None:
-            return _format_response(worqen_api_result)
+        for project in PROJECTS:
+            result = project.try_dispatch(name, args, _format_response)
+            if result is not None:
+                return result
 
         return _format_response({"error": f"Невідомий tool: {name}"})
 
@@ -102,19 +87,15 @@ app = Starlette(
 
 
 if __name__ == "__main__":
-    total = (
-        len(WORQEN_TOOLS) + len(WORQEN_WS_TOOLS)
-        + len(CODEHIVE_TOOLS) + len(WORQEN_API_TOOLS)
-    )
+    per_project = [(p.name, len(p.tools())) for p in PROJECTS]
+    total = sum(n for _, n in per_project)
+
     print("=" * 60)
-    print("CodeHive MCP Server v2.3: http://127.0.0.1:8765")
+    print("CodeHive MCP Server v2.4: http://127.0.0.1:8765")
     print("Endpoint:                 http://127.0.0.1:8765/mcp")
     print("=" * 60)
-    print(
-        f"Tools: {total} "
-        f"({len(WORQEN_TOOLS)} worqen_* + {len(WORQEN_WS_TOOLS)} worqen_ws_* "
-        f"+ {len(CODEHIVE_TOOLS)} codehive_* + {len(WORQEN_API_TOOLS)} worqen_api_*)"
-    )
+    breakdown = " + ".join(f"{n} {name}_*" for name, n in per_project)
+    print(f"Tools: {total} ({breakdown})")
     print("Cache TTL: 30s")
     print("=" * 60)
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="info")
