@@ -14,8 +14,8 @@ from typing import Any
 
 from googleapiclient.errors import HttpError
 
-from projects.codehive.gdoc_reader import list_all_docs, resolve_doc
-from projects.codehive.config import CODEHIVE_MAX_RECURSION_DEPTH, GOOGLE_DOC_MIME
+from projects.codehive.gdoc_reader import resolve_doc
+from projects.codehive.config import GOOGLE_DOC_MIME
 from projects.codehive.writers.safety import SafetyError, check_write_allowed
 from shared.doc_writers import create_doc_in_folder
 from shared.drive_client import get_service as get_drive_service
@@ -87,11 +87,9 @@ def create_doc(
     if not folder_query:
         return {"error": "folder_query не може бути порожнім"}
 
-    # 2. Resolve folder_query
+    # 2. Resolve folder_query (depth-independent native Drive search)
     try:
-        all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
-        folders = [d for d in all_data["items"] if d["kind"] == "folder"]
-        folder_meta = resolve_doc(folder_query, folders)
+        folder_meta = resolve_doc(folder_query, kind_filter=("folder",))
     except ValueError as e:
         return {"error": f"Папка не знайдена: {e}"}
 
