@@ -11,6 +11,7 @@ from projects.codehive.writers import replace_text as replace_text_writer
 from projects.codehive.writers import insert_text as insert_text_writer
 from projects.codehive.writers import create_doc as create_doc_writer
 from projects.codehive.writers import create_folder as create_folder_writer
+from projects.codehive.writers import create_sheet as create_sheet_writer
 
 
 CODEHIVE_TOOLS: list[Tool] = [
@@ -280,6 +281,51 @@ CODEHIVE_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="codehive_create_sheet",
+        description=(
+            "Create a new spreadsheet (gsheet by default or xlsx) in CodeHive Agency Drive. "
+            "name: file name (for xlsx the .xlsx suffix is added automatically if missing). "
+            "parent_folder: Drive ID or partial name of the target folder. Default — CodeHive Agency root. "
+            "format: 'gsheet' (default) or 'xlsx'. "
+            "columns: optional 1D list — written as header row in the first sheet. "
+            "allow_duplicate: by default refuses to create if a file with the same name + MIME already exists in the folder. "
+            "dry_run=true returns preview without creating. "
+            "CONFIRM-FLOW: before calling without dry_run, show the user where and what will be created."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "File name (no extension needed for gsheet; .xlsx suffix auto-added for xlsx).",
+                },
+                "parent_folder": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of parent folder. Default: CodeHive Agency root.",
+                },
+                "format": {
+                    "type": "string",
+                    "enum": ["gsheet", "xlsx"],
+                    "description": "Spreadsheet type. Default: gsheet.",
+                },
+                "columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional header row (1D list of column names).",
+                },
+                "allow_duplicate": {
+                    "type": "boolean",
+                    "description": "Allow creation when a file with the same name already exists. Default false.",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Preview without creating. Default false.",
+                },
+            },
+            "required": ["name"],
+        },
+    ),
+    Tool(
         name="codehive_search",
         description=(
             "Search inside CodeHive Agency. "
@@ -516,6 +562,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             values=args["values"],
             dry_run=args.get("dry_run", False),
             force_overwrite=args.get("force_overwrite", False),
+        )
+
+    if name == "codehive_create_sheet":
+        return create_sheet_writer.create_sheet(
+            name=args["name"],
+            parent_folder=args.get("parent_folder"),
+            format=args.get("format", "gsheet"),
+            columns=args.get("columns"),
+            allow_duplicate=args.get("allow_duplicate", False),
+            dry_run=args.get("dry_run", False),
         )
 
     if name == "codehive_search":
