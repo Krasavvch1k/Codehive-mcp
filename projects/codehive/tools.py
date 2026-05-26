@@ -49,6 +49,25 @@ CODEHIVE_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="codehive_resolve",
+        description=(
+            "Resolve a file/folder in CodeHive Agency Drive by name substring or full Drive ID. "
+            "Returns a single candidate with reconstructed path. If multiple files match — returns "
+            "an error with the candidate list for refinement. "
+            "Useful for verifying that other codehive tools will resolve your query correctly."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Name substring (case-insensitive) or full Drive ID.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
         name="codehive_read_doc",
         description=(
             "Read a gdoc from CodeHive Agency as markdown. "
@@ -273,6 +292,12 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
         if max_depth is None:
             return gdoc_reader.list_all_docs()
         return gdoc_reader.list_all_docs(max_depth=int(max_depth))
+
+    if name == "codehive_resolve":
+        try:
+            return gdoc_reader.resolve_doc(args["query"])
+        except ValueError as e:
+            return {"error": str(e)}
 
     if name == "codehive_read_doc":
         return gdoc_reader.read_doc(query=args["query"])
