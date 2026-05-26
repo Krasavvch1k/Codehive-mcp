@@ -8,6 +8,7 @@ from projects.codehive import gdoc_reader
 from projects.codehive.writers import replace_text as replace_text_writer
 from projects.codehive.writers import insert_text as insert_text_writer
 from projects.codehive.writers import create_doc as create_doc_writer
+from projects.codehive.writers import create_folder as create_folder_writer
 
 
 CODEHIVE_TOOLS: list[Tool] = [
@@ -208,6 +209,58 @@ CODEHIVE_TOOLS: list[Tool] = [
             "required": ["name", "folder_query"],
         },
     ),
+    Tool(
+        name="codehive_create_folder",
+        description=(
+            "Create a new folder inside a CodeHive Agency Drive folder. "
+            "parent_folder is optional — defaults to CodeHive Agency root. "
+            "Substring (case-insensitive) or full Drive ID for parent_folder. "
+            "allow_duplicate=true permits creating a folder with the same name "
+            "as an existing one. dry_run=true returns a preview without creating. "
+            "CONFIRM-FLOW: confirm with the user before calling (no preview mode unless dry_run=true)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the new folder.",
+                },
+                "parent_folder": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of parent folder. Default: CodeHive Agency root.",
+                },
+                "allow_duplicate": {
+                    "type": "boolean",
+                    "description": "Allow creating a folder when one with the same name already exists. Default false.",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Return preview without creating. Default false.",
+                },
+            },
+            "required": ["name"],
+        },
+    ),
+    Tool(
+        name="codehive_force_refresh",
+        description=(
+            "Invalidate the TTL cache, either targeted (one file/folder by query) or full. "
+            "Without query — clears entire cache (file + folder). "
+            "With query — clears cache for one file/folder (resolved via Drive search). "
+            "Useful when you just edited a file manually in Drive UI and want fresh data immediately, "
+            "or when new files appeared in a folder but the folder cache TTL has not expired."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or substring of name. Omit to clear entire cache.",
+                },
+            },
+        },
+    ),
 ]
 
 
@@ -257,5 +310,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             folder_query=args["folder_query"],
             initial_content=args.get("initial_content", ""),
         )
+
+    if name == "codehive_create_folder":
+        return create_folder_writer.create_folder(
+            name=args["name"],
+            parent_folder=args.get("parent_folder"),
+            allow_duplicate=args.get("allow_duplicate", False),
+            dry_run=args.get("dry_run", False),
+        )
+
+    if name == "codehive_force_refresh":
+        return gdoc_reader.force_refresh(query=args.get("query"))
 
     return None

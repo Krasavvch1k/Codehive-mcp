@@ -4,6 +4,8 @@ from typing import Optional
 
 from shared.drive_client import (
     _list_folder_children,
+    clear_cache as clear_drive_cache,
+    clear_folder_cache,
     download_file,
     get_folder_or_drive_name,
     get_service,
@@ -291,4 +293,36 @@ def search(
         "total_content_matches": len(content_matches),
         "name_matches": name_matches[:limit],
         "content_matches": content_matches[:limit],
+    }
+
+
+
+def force_refresh(query: Optional[str] = None) -> dict:
+    """
+    Invalidate cache, either targeted or fully.
+
+    query:
+        - None or empty — clears entire TTL cache (file + folder)
+        - Drive ID or substring — clears cache for a single file/folder
+
+    Useful when:
+    - you manually edited a file in Drive UI and want fresh content immediately
+    - new files appeared in a folder (folder cache TTL not yet expired)
+    """
+    if not query:
+        clear_drive_cache()
+        clear_folder_cache()
+        return {"ok": True, "cleared": "all"}
+
+    # Targeted refresh — resolve to id first
+    target = resolve_doc(query)
+    fid = target["id"]
+    clear_drive_cache(fid)
+    clear_folder_cache(fid)
+    return {
+        "ok": True,
+        "cleared": "single",
+        "id": fid,
+        "name": target["name"],
+        "kind": target["kind"],
     }
