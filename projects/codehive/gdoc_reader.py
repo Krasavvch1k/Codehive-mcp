@@ -4,8 +4,11 @@ from typing import Optional
 
 from shared.drive_client import (
     _list_folder_children,
+    build_path_for_file,
     download_file,
+    get_file_metadata,
     get_service,
+    search_files_by_name,
 )
 from projects.codehive.config import (
     CODEHIVE_ROOT_FOLDER_ID,
@@ -30,6 +33,39 @@ def _resolve_root(folder_id: Optional[str]) -> str:
             "Add CODEHIVE_ROOT_FOLDER_ID=<id> and restart the MCP server."
         )
     return CODEHIVE_ROOT_FOLDER_ID
+
+
+def _looks_like_drive_id(s: str) -> bool:
+    """Heuristic: Drive IDs are >25 chars, no spaces or parens."""
+    return len(s) > 25 and " " not in s and "(" not in s
+
+
+def _get_folder_name(folder_id: str) -> Optional[str]:
+    """Best-effort fetch of a folder display name (handles Shared Drive root quirk)."""
+    service = get_service()
+    try:
+        meta = service.files().get(
+            fileId=folder_id,
+            fields="id, name, mimeType",
+            supportsAllDrives=True,
+        ).execute()
+        name = meta.get("name")
+    except Exception:
+        name = None
+
+    # Drive API quirk: files().get() для Shared Drive root повертає "Drive".
+    # Реальна назва — у drives().get(driveId=...).
+    if name in (None, "Drive") and folder_id == CODEHIVE_ROOT_FOLDER_ID:
+        try:
+            drive_meta = service.drives().get(
+                driveId=folder_id,
+                fields="id, name",
+            ).execute()
+            name = drive_meta.get("name") or name
+        except Exception:
+            pass
+
+    return name
 
 
 def _classify_item(item: dict) -> str:
@@ -66,31 +102,119 @@ def _normalize_item(item: dict, parent_id: str, parent_name: Optional[str]) -> d
     }
 
 
+def _format_wrong_kind_error(
+    query: str,
+    found: list[dict],
+    expected_kinds: tuple[str, ...],
+) -> str:
+    """Format error when query matched files but of wrong kind."""
+    previews = []
+    for f in found[:5]:
+        previews.append(
+            f"{f['name']} (kind={f['kind']}, id: {f['id'][:12]}...)"
+        )
+    more = f", ...{len(found) - 5} more" if len(found) > 5 else ""
+    expected = "/".join(expected_kinds)
+    return (
+        f"Query '{query}' matched {len(found)} file(s) but none of type "
+        f"{expected}. Found: {'; '.join(previews)}{more}"
+    )
+
+
+def _resolve_via_drive_search(
+    query: str,
+    kind_filter: Optional[tuple[str, ...]] = None,
+) -> dict:
+    """
+    Find a file via native Drive search (one API call) regardless of tree depth.
+
+    kind_filter: if provided, only files with kind in this tuple are returned.
+        Files of other kind raise an informative ValueError.
+
+    Returns normalized item with reconstructed path on single match.
+    Raises ValueError on 0 matches, >1 matches, or wrong-kind matches.
+    """
+    root_id = _resolve_root(None)
+    root_name = _get_folder_name(root_id)
+
+    # Optimization: if kind_filter is only ("folder",) — filter at Drive query level
+    mime_pre_filter: Optional[str] = None
+    if kind_filter == ("folder",):
+        mime_pre_filter = GOOGLE_FOLDER_MIME
+
+    # ID-style query — try as exact file ID first
+    if _looks_like_drive_id(query):
+        try:
+            meta = get_file_metadata(query)
+            if meta.get("id"):
+                normalized = _normalize_item(meta, parent_id="", parent_name=None)
+                if kind_filter and normalized["kind"] not in kind_filter:
+                    raise ValueError(
+                        _format_wrong_kind_error(query, [normalized], kind_filter)
+                    )
+                path = build_path_for_file(meta["id"], root_id, root_name)
+                if path:
+                    normalized["path"] = path
+                normalized["depth"] = path.count(" > ") if path else 0
+                return normalized
+        except ValueError:
+            raise
+        except Exception:
+            pass  # not a valid id or no access — fall through to name search
+
+    # Substring in name — native Drive search
+    raw_results = search_files_by_name(
+        query, drive_id=root_id, mime_type=mime_pre_filter
+    )
+
+    # Drive API case-insensitive substring isn't strictly consistent —
+    # additionally filter locally
+    q_lower = query.lower()
+    raw_results = [r for r in raw_results if q_lower in r.get("name", "").lower()]
+
+    if not raw_results:
+        raise ValueError(
+            f"Nothing found for query='{query}' in CodeHive Agency. "
+            f"Try codehive_list_all_docs to see available names."
+        )
+
+    # Normalize all results
+    normalized_all = [
+        _normalize_item(r, parent_id="", parent_name=None) for r in raw_results
+    ]
+
+    # Apply kind_filter
+    if kind_filter:
+        matched = [n for n in normalized_all if n["kind"] in kind_filter]
+        if not matched:
+            raise ValueError(
+                _format_wrong_kind_error(query, normalized_all, kind_filter)
+            )
+        normalized_all = matched
+
+    if len(normalized_all) > 1:
+        previews = []
+        for n in normalized_all[:5]:
+            path = build_path_for_file(n["id"], root_id, root_name) or "?"
+            previews.append(f"{n['name']} [{path}] (id: {n['id'][:12]}...)")
+        more = f", ...{len(normalized_all) - 5} more" if len(normalized_all) > 5 else ""
+        raise ValueError(
+            f"Query '{query}' matched {len(normalized_all)} files. "
+            f"Refine the query. Candidates: {'; '.join(previews)}{more}"
+        )
+
+    # Single match — add path
+    found = normalized_all[0]
+    path = build_path_for_file(found["id"], root_id, root_name)
+    if path:
+        found["path"] = path
+    found["depth"] = path.count(" > ") if path else 0
+    return found
+
+
 def list_folder(folder_id: Optional[str] = None) -> dict:
     fid = _resolve_root(folder_id)
-
-    service = get_service()
-    try:
-        folder_meta = service.files().get(
-            fileId=fid,
-            fields="id, name, mimeType",
-            supportsAllDrives=True,
-        ).execute()
-        folder_name = folder_meta.get("name")
-    except Exception:
-        folder_name = None
-
-    # Drive API quirk: для shared drive root files().get() повертає name="Drive".
-    # Реальна назва — у drives().get(driveId=...).
-    if folder_name in (None, "Drive") and fid == CODEHIVE_ROOT_FOLDER_ID:
-        try:
-            drive_meta = service.drives().get(
-                driveId=fid,
-                fields="id, name",
-            ).execute()
-            folder_name = drive_meta.get("name") or folder_name
-        except Exception:
-            pass
+    folder_name = _get_folder_name(fid)
 
     raw_children = _list_folder_children(fid)
 
@@ -118,16 +242,7 @@ def list_folder(folder_id: Optional[str] = None) -> dict:
 
 def list_all_docs(max_depth: int = CODEHIVE_MAX_RECURSION_DEPTH) -> dict:
     root_id = _resolve_root(None)
-    service = get_service()
-    try:
-        root_meta = service.files().get(
-            fileId=root_id,
-            fields="id, name",
-            supportsAllDrives=True,
-        ).execute()
-        root_name = root_meta.get("name")
-    except Exception:
-        root_name = None
+    root_name = _get_folder_name(root_id)
 
     items: list[dict] = []
     total_folders = 0
@@ -173,42 +288,59 @@ def list_all_docs(max_depth: int = CODEHIVE_MAX_RECURSION_DEPTH) -> dict:
     }
 
 
-def resolve_doc(query: str, all_docs: list[dict]) -> dict:
+def resolve_doc(
+    query: str,
+    all_docs: Optional[list[dict]] = None,
+    kind_filter: Optional[tuple[str, ...]] = None,
+) -> dict:
+    """
+    Resolve a file by query.
+
+    Two modes:
+      - all_docs provided (legacy): search within the provided list. Used by
+        consumers that already have a filtered list_all_docs result (e.g. search).
+      - all_docs is None: native Drive search via _resolve_via_drive_search,
+        with optional kind_filter. Works regardless of tree depth.
+    """
     q = query.strip()
+    if not q:
+        raise ValueError("query cannot be empty")
 
-    if len(q) > 25 and " " not in q and "(" not in q:
-        for d in all_docs:
-            if d["id"] == q:
-                return d
+    # Mode 1: legacy — search within provided list
+    if all_docs is not None:
+        if _looks_like_drive_id(q):
+            for d in all_docs:
+                if d["id"] == q:
+                    return d
 
-    q_lower = q.lower()
-    matches = [d for d in all_docs if q_lower in d["name"].lower()]
+        q_lower = q.lower()
+        matches = [d for d in all_docs if q_lower in d["name"].lower()]
 
-    if not matches:
-        raise ValueError(
-            f"Document matching '{query}' not found in CodeHive Agency. "
-            f"Try codehive_list_all_docs to see all names."
-        )
+        if not matches:
+            raise ValueError(
+                f"Document matching '{query}' not found in CodeHive Agency. "
+                f"Try codehive_list_all_docs to see all names."
+            )
 
-    if len(matches) > 1:
-        names = [
-            f"{m['name']} [{m.get('path', '?')}] (id: {m['id'][:12]}...)"
-            for m in matches[:5]
-        ]
-        more = f", ...{len(matches) - 5} more" if len(matches) > 5 else ""
-        raise ValueError(
-            f"Query '{query}' matched {len(matches)} documents. "
-            f"Refine the query. Candidates: {'; '.join(names)}{more}"
-        )
+        if len(matches) > 1:
+            names = [
+                f"{m['name']} [{m.get('path', '?')}] (id: {m['id'][:12]}...)"
+                for m in matches[:5]
+            ]
+            more = f", ...{len(matches) - 5} more" if len(matches) > 5 else ""
+            raise ValueError(
+                f"Query '{query}' matched {len(matches)} documents. "
+                f"Refine the query. Candidates: {'; '.join(names)}{more}"
+            )
 
-    return matches[0]
+        return matches[0]
+
+    # Mode 2: native Drive search (depth-independent)
+    return _resolve_via_drive_search(q, kind_filter=kind_filter)
 
 
 def read_doc(query: str) -> dict:
-    all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
-    gdocs = [d for d in all_data["items"] if d["kind"] == "gdoc"]
-
-    doc_meta = resolve_doc(query, gdocs)
+    doc_meta = resolve_doc(query, kind_filter=("gdoc",))
 
     content = download_file(doc_meta["id"], fmt="gdoc")
     text = docx_bytes_to_markdown(content)
@@ -224,7 +356,6 @@ def read_doc(query: str) -> dict:
     }
 
 
-
 def read_file(query: str) -> dict:
     """
     Read a non-Office file from CodeHive Agency as text.
@@ -238,10 +369,7 @@ def read_file(query: str) -> dict:
         ValueError if not found, ambiguous, or not a text/pdf file
         (NotTextFileError subclasses ValueError).
     """
-    all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
-    files = [d for d in all_data["items"] if d["kind"] in ("other", "pdf")]
-
-    doc_meta = resolve_doc(query, files)
+    doc_meta = resolve_doc(query, kind_filter=("other", "pdf"))
 
     fmt = "pdf" if doc_meta["kind"] == "pdf" else "md"
     content = download_file(doc_meta["id"], fmt=fmt)
@@ -257,6 +385,7 @@ def read_file(query: str) -> dict:
         "length": len(text),
         "text": text,
     }
+
 
 def search(
     query: str,
