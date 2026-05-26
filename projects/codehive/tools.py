@@ -5,6 +5,7 @@ from typing import Optional
 from mcp.types import Tool
 
 from projects.codehive import gdoc_reader
+from projects.codehive import sheets_reader
 from projects.codehive.writers import replace_text as replace_text_writer
 from projects.codehive.writers import insert_text as insert_text_writer
 from projects.codehive.writers import create_doc as create_doc_writer
@@ -101,6 +102,48 @@ CODEHIVE_TOOLS: list[Tool] = [
                 "query": {
                     "type": "string",
                     "description": "Drive ID or partial name of a .md/.txt/.pdf file.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
+        name="codehive_read_sheet",
+        description=(
+            "Read a gsheet or xlsx file from CodeHive Agency. "
+            "query: full Drive ID or partial name (case-insensitive substring); must resolve to exactly one file. "
+            "sheet_name: optional — read only that worksheet; otherwise reads all sheets. "
+            "limit_rows / limit_cols: caps to avoid huge payloads (default 200 / 50, max 5000 / 200). "
+            "force_refresh: bypass TTL cache. "
+            "as_markdown: include a markdown table representation per sheet (default true). "
+            "Returns sheets_data[] with values (2D string list) and optional markdown."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gsheet or xlsx file.",
+                },
+                "sheet_name": {
+                    "type": "string",
+                    "description": "Optional worksheet title. If omitted, reads all sheets.",
+                },
+                "limit_rows": {
+                    "type": "integer",
+                    "description": "Max rows per sheet. Default 200, max 5000.",
+                },
+                "limit_cols": {
+                    "type": "integer",
+                    "description": "Max columns per sheet. Default 50, max 200.",
+                },
+                "force_refresh": {
+                    "type": "boolean",
+                    "description": "Bypass TTL cache. Default false.",
+                },
+                "as_markdown": {
+                    "type": "boolean",
+                    "description": "Include markdown table per sheet. Default true.",
                 },
             },
             "required": ["query"],
@@ -304,6 +347,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
 
     if name == "codehive_read_file":
         return gdoc_reader.read_file(query=args["query"])
+
+    if name == "codehive_read_sheet":
+        return sheets_reader.read_sheet(
+            query=args["query"],
+            sheet_name=args.get("sheet_name"),
+            limit_rows=args.get("limit_rows", 200),
+            limit_cols=args.get("limit_cols", 50),
+            force_refresh=args.get("force_refresh", False),
+            as_markdown=args.get("as_markdown", True),
+        )
 
     if name == "codehive_search":
         return gdoc_reader.search(
