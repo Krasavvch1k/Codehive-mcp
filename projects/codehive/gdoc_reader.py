@@ -86,6 +86,8 @@ def _classify_item(item: dict) -> str:
         return "docx"
     if mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         return "xlsx"
+    if mime == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        return "pptx"
     return "other"
 
 
