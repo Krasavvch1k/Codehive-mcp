@@ -42,6 +42,7 @@ from shared.drive_client import (
 from shared.safety import SafetyError, check_drive_unchanged
 from shared.sheets_client import (
     append_values as _gsheet_append_values,
+    update_values as _gsheet_update_values,
 )
 from shared.writes_log import log_doc_write
 
@@ -331,3 +332,133 @@ def append_row(
         "force_overwrite_used": force_overwrite,
         **result_payload,
     }
+
+
+# ---------------------------------------------------------------------------
+# Public API: update_cell
+# ---------------------------------------------------------------------------
+
+
+def update_cell(
+    query: str,
+    sheet: str,
+    cell: str,
+    value: Any,
+    dry_run: bool = False,
+    force_overwrite: bool = False,
+) -> dict[str, Any]:
+    """
+    Перезаписує ОДНУ комірку.
+
+    Args:
+        query: substring у name або повний Drive ID файла.
+        sheet: назва аркуша (рядково, як у файлі).
+        cell: A1-нотація однієї комірки ('A1', 'BC42').
+        value: нове значення (str/int/float/bool/None).
+        dry_run: preview без запису.
+        force_overwrite: пропустити drive-unchanged check.
+
+    Returns:
+        dict з ok / error / preview.
+    """
+    try:
+        _validate_a1_cell(cell)
+    except ValueError as e:
+        return {"error": str(e), "kind": "invalid_a1"}
+
+    try:
+        meta = _resolve_writable_sheet(query)
+    except SafetyError as e:
+        return {"error": str(e), "kind": e.kind}
+    except ValueError as e:
+        return {"error": str(e), "kind": "resolve_failed"}
+
+    if dry_run:
+        return {
+            "operation": "update_cell",
+            "file_id": meta["id"],
+            "file_name": meta["name"],
+            "kind": meta["kind"],
+            "path": meta.get("path"),
+            "sheet": sheet,
+            "cell": cell.upper(),
+            "value": value,
+            "would_write": True,
+            "dry_run": True,
+        }
+
+    file_id = meta["id"]
+    baseline_modified = fetch_current_drive_modified(file_id)
+
+    if not force_overwrite:
+        try:
+            check_drive_unchanged(file_id, baseline_modified)
+        except SafetyError as e:
+            return {
+                "error": str(e),
+                "kind": e.kind,
+                "hint": "Передай force_overwrite=True щоб ігнорувати.",
+            }
+
+    try:
+        if meta["kind"] == "gsheet":
+            full_range = _build_full_range(sheet, cell.upper())
+            api_resp = _gsheet_update_values(
+                spreadsheet_id=file_id,
+                range_str=full_range,
+                values=[[value]],
+            )
+            modified_after = fetch_current_drive_modified(file_id)
+            result_payload = {
+                "updated_range": api_resp.get("updatedRange"),
+                "updated_cells": api_resp.get("updatedCells"),
+            }
+        else:  # xlsx
+            wb, _ = _open_xlsx_workbook(file_id)
+            ws = _resolve_xlsx_sheet(wb, sheet)
+            col, row = _a1_cell_to_col_row(cell)
+            ws.cell(row=row, column=col, value=value)
+            upload_meta = _save_xlsx_and_upload(wb, file_id)
+            modified_after = upload_meta.get("modifiedTime")
+            result_payload = {"row": row, "col": col}
+
+    except SafetyError as e:
+        return {"error": str(e), "kind": e.kind}
+    except HttpError as e:
+        return {"error": f"API failed: {e}", "kind": "api_error"}
+    except Exception as e:
+        return {"error": f"unexpected: {e}", "kind": "unexpected"}
+
+    try:
+        log_doc_write(
+            project=PROJECT,
+            tool="update_cell",
+            file_id=file_id,
+            file_name=meta["name"],
+            payload={
+                "kind": meta["kind"],
+                "sheet": sheet,
+                "cell": cell.upper(),
+                "value": str(value) if value is not None else None,
+                "modified_before": baseline_modified,
+                "modified_after": modified_after,
+                "force_overwrite": force_overwrite,
+            },
+        )
+    except Exception as e:
+        logger.warning("writes_log failed for update_cell: %s", e)
+
+    return {
+        "ok": True,
+        "file_id": file_id,
+        "file_name": meta["name"],
+        "kind": meta["kind"],
+        "sheet": sheet,
+        "cell": cell.upper(),
+        "value": value,
+        "modified_before": baseline_modified,
+        "modified_after": modified_after,
+        "force_overwrite_used": force_overwrite,
+        **result_payload,
+    }
+

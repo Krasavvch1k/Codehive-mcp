@@ -194,6 +194,48 @@ CODEHIVE_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="codehive_update_cell",
+        description=(
+            "Overwrite a SINGLE cell in a gsheet or xlsx in CodeHive Agency. "
+            "query: full Drive ID or partial name (case-insensitive substring); must resolve to exactly one gsheet/xlsx. "
+            "sheet: worksheet title (exact match). "
+            "cell: A1 notation of one cell (e.g. 'A1', 'BC42'). "
+            "value: new value (string/int/float/bool/null). "
+            "dry_run=true returns preview without writing. "
+            "force_overwrite bypasses the drive-unchanged safety check. "
+            "CONFIRM-FLOW: before calling without dry_run, show the user where and what will be written."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gsheet or xlsx.",
+                },
+                "sheet": {
+                    "type": "string",
+                    "description": "Worksheet title (exact match).",
+                },
+                "cell": {
+                    "type": "string",
+                    "description": "A1 notation of one cell (e.g. 'A1', 'BC42').",
+                },
+                "value": {
+                    "description": "New value (string/int/float/bool/null).",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Preview without writing. Default false.",
+                },
+                "force_overwrite": {
+                    "type": "boolean",
+                    "description": "Bypass drive-unchanged safety check. Default false.",
+                },
+            },
+            "required": ["query", "sheet", "cell", "value"],
+        },
+    ),
+    Tool(
         name="codehive_search",
         description=(
             "Search inside CodeHive Agency. "
@@ -408,6 +450,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             sheet=args["sheet"],
             values=args["values"],
             copy_style_from_last=args.get("copy_style_from_last", True),
+            dry_run=args.get("dry_run", False),
+            force_overwrite=args.get("force_overwrite", False),
+        )
+
+    if name == "codehive_update_cell":
+        return sheets_writer.update_cell(
+            query=args["query"],
+            sheet=args["sheet"],
+            cell=args["cell"],
+            value=args["value"],
             dry_run=args.get("dry_run", False),
             force_overwrite=args.get("force_overwrite", False),
         )
