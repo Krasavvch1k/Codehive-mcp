@@ -462,3 +462,159 @@ def update_cell(
         **result_payload,
     }
 
+
+# ---------------------------------------------------------------------------
+# Public API: update_range
+# ---------------------------------------------------------------------------
+
+
+def update_range(
+    query: str,
+    sheet: str,
+    range_a1: str,
+    values: list[list],
+    dry_run: bool = False,
+    force_overwrite: bool = False,
+) -> dict[str, Any]:
+    """
+    Перезаписує прямокутний діапазон значень.
+
+    Args:
+        query: substring у name або Drive ID.
+        sheet: назва аркуша.
+        range_a1: A1-діапазон ('A1:B10').
+        values: 2D-список рядок-стовпець. Має співпадати розміром з range_a1
+            (або менше — тоді хвіст не оновиться, але краще явно).
+        dry_run: preview без запису.
+        force_overwrite: пропустити drive-unchanged check.
+
+    Returns:
+        dict з ok / error / preview.
+    """
+    try:
+        _validate_a1_range(range_a1)
+    except ValueError as e:
+        return {"error": str(e), "kind": "invalid_a1"}
+
+    if not values or not all(isinstance(r, list) for r in values):
+        return {
+            "error": "values має бути 2D-list (list of lists)",
+            "kind": "invalid_values",
+        }
+
+    try:
+        meta = _resolve_writable_sheet(query)
+    except SafetyError as e:
+        return {"error": str(e), "kind": e.kind}
+    except ValueError as e:
+        return {"error": str(e), "kind": "resolve_failed"}
+
+    rows_count = len(values)
+    cols_count = max(len(r) for r in values) if values else 0
+
+    if dry_run:
+        return {
+            "operation": "update_range",
+            "file_id": meta["id"],
+            "file_name": meta["name"],
+            "kind": meta["kind"],
+            "path": meta.get("path"),
+            "sheet": sheet,
+            "range": range_a1.upper(),
+            "rows": rows_count,
+            "cols": cols_count,
+            "values_preview": [r[:5] for r in values[:5]],  # 5x5 first
+            "would_write": True,
+            "dry_run": True,
+        }
+
+    file_id = meta["id"]
+    baseline_modified = fetch_current_drive_modified(file_id)
+
+    if not force_overwrite:
+        try:
+            check_drive_unchanged(file_id, baseline_modified)
+        except SafetyError as e:
+            return {
+                "error": str(e),
+                "kind": e.kind,
+                "hint": "Передай force_overwrite=True щоб ігнорувати.",
+            }
+
+    try:
+        if meta["kind"] == "gsheet":
+            full_range = _build_full_range(sheet, range_a1.upper())
+            api_resp = _gsheet_update_values(
+                spreadsheet_id=file_id,
+                range_str=full_range,
+                values=values,
+            )
+            modified_after = fetch_current_drive_modified(file_id)
+            result_payload = {
+                "updated_range": api_resp.get("updatedRange"),
+                "updated_cells": api_resp.get("updatedCells"),
+            }
+        else:  # xlsx
+            wb, _ = _open_xlsx_workbook(file_id)
+            ws = _resolve_xlsx_sheet(wb, sheet)
+            # Парсимо start cell з range_a1
+            start_cell, _end_cell = range_a1.upper().split(":")
+            start_col, start_row = _a1_cell_to_col_row(start_cell)
+            for r_offset, row_values in enumerate(values):
+                for c_offset, val in enumerate(row_values):
+                    ws.cell(
+                        row=start_row + r_offset,
+                        column=start_col + c_offset,
+                        value=val,
+                    )
+            upload_meta = _save_xlsx_and_upload(wb, file_id)
+            modified_after = upload_meta.get("modifiedTime")
+            result_payload = {
+                "start_row": start_row,
+                "start_col": start_col,
+                "rows_written": rows_count,
+                "cols_written": cols_count,
+            }
+
+    except SafetyError as e:
+        return {"error": str(e), "kind": e.kind}
+    except HttpError as e:
+        return {"error": f"API failed: {e}", "kind": "api_error"}
+    except Exception as e:
+        return {"error": f"unexpected: {e}", "kind": "unexpected"}
+
+    try:
+        log_doc_write(
+            project=PROJECT,
+            tool="update_range",
+            file_id=file_id,
+            file_name=meta["name"],
+            payload={
+                "kind": meta["kind"],
+                "sheet": sheet,
+                "range": range_a1.upper(),
+                "rows": rows_count,
+                "cols": cols_count,
+                "modified_before": baseline_modified,
+                "modified_after": modified_after,
+                "force_overwrite": force_overwrite,
+            },
+        )
+    except Exception as e:
+        logger.warning("writes_log failed for update_range: %s", e)
+
+    return {
+        "ok": True,
+        "file_id": file_id,
+        "file_name": meta["name"],
+        "kind": meta["kind"],
+        "sheet": sheet,
+        "range": range_a1.upper(),
+        "rows": rows_count,
+        "cols": cols_count,
+        "modified_before": baseline_modified,
+        "modified_after": modified_after,
+        "force_overwrite_used": force_overwrite,
+        **result_payload,
+    }
+

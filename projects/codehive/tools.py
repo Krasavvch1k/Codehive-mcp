@@ -236,6 +236,50 @@ CODEHIVE_TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="codehive_update_range",
+        description=(
+            "Overwrite a rectangular range in a gsheet or xlsx in CodeHive Agency. "
+            "query: full Drive ID or partial name (case-insensitive substring); must resolve to exactly one gsheet/xlsx. "
+            "sheet: worksheet title (exact match). "
+            "range: A1 notation of the range (e.g. 'A1:C10'). "
+            "values: 2D list (rows of values). Size of values should cover the range, otherwise Sheets API errors out. "
+            "dry_run=true returns preview without writing. "
+            "force_overwrite bypasses the drive-unchanged safety check. "
+            "CONFIRM-FLOW: before calling without dry_run, show the user where and what will be written."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Drive ID or partial name of a gsheet or xlsx.",
+                },
+                "sheet": {
+                    "type": "string",
+                    "description": "Worksheet title (exact match).",
+                },
+                "range": {
+                    "type": "string",
+                    "description": "A1 range (e.g. 'A1:C10').",
+                },
+                "values": {
+                    "type": "array",
+                    "items": {"type": "array"},
+                    "description": "2D list (list of lists) of row values.",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "Preview without writing. Default false.",
+                },
+                "force_overwrite": {
+                    "type": "boolean",
+                    "description": "Bypass drive-unchanged safety check. Default false.",
+                },
+            },
+            "required": ["query", "sheet", "range", "values"],
+        },
+    ),
+    Tool(
         name="codehive_search",
         description=(
             "Search inside CodeHive Agency. "
@@ -460,6 +504,16 @@ def dispatch(name: str, args: dict) -> Optional[dict]:
             sheet=args["sheet"],
             cell=args["cell"],
             value=args["value"],
+            dry_run=args.get("dry_run", False),
+            force_overwrite=args.get("force_overwrite", False),
+        )
+
+    if name == "codehive_update_range":
+        return sheets_writer.update_range(
+            query=args["query"],
+            sheet=args["sheet"],
+            range_a1=args["range"],
+            values=args["values"],
             dry_run=args.get("dry_run", False),
             force_overwrite=args.get("force_overwrite", False),
         )
