@@ -4,11 +4,14 @@ from typing import Optional
 
 from shared.drive_client import (
     _list_folder_children,
+    build_path_for_file,
     clear_cache as clear_drive_cache,
     clear_folder_cache,
     download_file,
     get_folder_or_drive_name,
     get_service,
+    search_files_by_content,
+    search_files_by_name,
 )
 from projects.codehive.config import (
     CODEHIVE_ROOT_FOLDER_ID,
@@ -247,26 +250,72 @@ def search(
     limit: int = 20,
     context_chars: int = 200,
 ) -> dict:
+    """
+    Search files in CodeHive Agency Drive.
+
+    scope:
+        - "names" — search by file name (substring, case-insensitive).
+        - "content" — search by file content (gdoc fullText index, depth-independent).
+        - "both" — both name and content matches.
+
+    Native Drive API search — depth-independent (works for files at any depth,
+    not bound by CODEHIVE_MAX_RECURSION_DEPTH).
+
+    Note: name scope matches against file name only, NOT against path. To find
+    files inside a folder whose name matches the query, list that folder explicitly.
+
+    Path для matched items реконструюється рекурсивно через build_path_for_file
+    з TTL-кешем парентів.
+    """
     if scope not in ("names", "content", "both"):
         raise ValueError(f"scope must be 'names' / 'content' / 'both', not '{scope}'")
+    if not query or not query.strip():
+        raise ValueError("query must not be empty")
 
-    all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
-    items = all_data["items"]
-    q_lower = query.lower()
+    root_id = _resolve_root(None)
+    root_name = _get_folder_name(root_id)
+    fetch_size = max(limit * 2, 50)
 
     name_matches: list[dict] = []
     content_matches: list[dict] = []
 
+    # --- scope: names (and "both") ---
     if scope in ("names", "both"):
-        for it in items:
-            if q_lower in it["name"].lower() or (
-                it.get("path") and q_lower in it["path"].lower()
-            ):
-                name_matches.append(it)
+        raw = search_files_by_name(
+            name_substring=query,
+            drive_id=root_id,
+            page_size=fetch_size,
+        )
+        for item in raw:
+            kind = _classify_item(item)
+            path = build_path_for_file(
+                file_id=item["id"],
+                root_id=root_id,
+                root_name=root_name,
+            )
+            name_matches.append({
+                "id": item["id"],
+                "name": item["name"],
+                "kind": kind,
+                "path": path,
+                "mime": item.get("mimeType"),
+                "modified": item.get("modifiedTime"),
+            })
 
+    # --- scope: content (and "both") ---
     if scope in ("content", "both"):
-        gdocs = [d for d in items if d["kind"] == "gdoc"]
-        for d in gdocs:
+        raw = search_files_by_content(
+            fulltext_query=query,
+            drive_id=root_id,
+            mime_type=GOOGLE_DOC_MIME,
+            page_size=fetch_size,
+        )
+        for d in raw:
+            path = build_path_for_file(
+                file_id=d["id"],
+                root_id=root_id,
+                root_name=root_name,
+            )
             try:
                 content = download_file(d["id"], fmt="gdoc")
                 full_text = docx_bytes_to_plain_text(content)
@@ -275,14 +324,14 @@ def search(
                     content_matches.append({
                         "id": d["id"],
                         "name": d["name"],
-                        "path": d.get("path"),
+                        "path": path,
                         "snippet": snippet,
                     })
             except Exception as e:
                 content_matches.append({
                     "id": d["id"],
                     "name": d["name"],
-                    "path": d.get("path"),
+                    "path": path,
                     "error": str(e),
                 })
 

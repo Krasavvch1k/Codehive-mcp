@@ -13,8 +13,7 @@ from typing import Any
 
 from googleapiclient.errors import HttpError
 
-from projects.codehive.gdoc_reader import list_all_docs, resolve_doc
-from projects.codehive.config import CODEHIVE_MAX_RECURSION_DEPTH
+from projects.codehive.gdoc_reader import resolve_doc
 from projects.codehive.writers.safety import SafetyError, check_write_allowed
 from shared.doc_writers import insert_text_in_doc
 from shared.drive_client import get_service as get_drive_service
@@ -50,11 +49,9 @@ def insert_text(
     Returns:
         dict з ok / error.
     """
-    # 1. Resolve query
+    # 1. Resolve query (native Drive search, depth-independent)
     try:
-        all_data = list_all_docs(max_depth=CODEHIVE_MAX_RECURSION_DEPTH)
-        gdocs = [d for d in all_data["items"] if d["kind"] == "gdoc"]
-        doc_meta = resolve_doc(query, gdocs)
+        doc_meta = resolve_doc(query, kind_filter=("gdoc",))
     except ValueError as e:
         return {"error": str(e)}
 

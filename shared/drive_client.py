@@ -365,6 +365,50 @@ def search_files_by_name(
     return response.get("files", [])
 
 
+def search_files_by_content(
+    fulltext_query: str,
+    drive_id: str,
+    mime_type: Optional[str] = None,
+    page_size: int = 100,
+) -> list[dict]:
+    """
+    Знаходить файли по fullText індексу через Drive API.
+    Один API call, без рекурсії — працює незалежно від глибини файла.
+
+    fulltext_query: текст для пошуку у вмісті (case-insensitive у Drive).
+    drive_id: ID Shared Drive (corpora=drive).
+    mime_type: опційний фільтр по mimeType (наприклад GOOGLE_DOC_MIME для gdoc).
+    page_size: ліміт першої сторінки (за замовчуванням 100).
+
+    Returns: список raw items з полями id, name, mimeType, parents, modifiedTime, size.
+    """
+    service = get_service()
+
+    # Екрануємо одинарні лапки (Drive query syntax)
+    escaped = fulltext_query.replace("'", "\\'")
+    q_parts = [f"fullText contains '{escaped}'", "trashed = false"]
+    if mime_type:
+        q_parts.append(f"mimeType = '{mime_type}'")
+    q = " and ".join(q_parts)
+
+    response = (
+        service.files()
+        .list(
+            q=q,
+            corpora="drive",
+            driveId=drive_id,
+            includeItemsFromAllDrives=True,
+            supportsAllDrives=True,
+            fields=(
+                "files(id, name, mimeType, parents, modifiedTime, size)"
+            ),
+            pageSize=page_size,
+        )
+        .execute()
+    )
+    return response.get("files", [])
+
+
 # Кеш breadcrumb-шляхів: file_id -> (path_string, timestamp)
 _path_cache: dict[str, tuple[str, float]] = {}
 
