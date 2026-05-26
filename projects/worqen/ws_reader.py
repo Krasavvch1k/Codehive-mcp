@@ -16,6 +16,7 @@ from shared.drive_client import (
     clear_cache as clear_drive_cache,
     clear_folder_cache,
     download_file,
+    get_folder_or_drive_name,
     get_service,
 )
 from shared.gdoc import (
@@ -90,31 +91,8 @@ def _normalize_item(item: dict, parent_id: str, parent_name: Optional[str]) -> d
 
 
 def _get_folder_name(folder_id: str) -> Optional[str]:
-    """Назва папки/драйва. Drive API для shared drive root повертає 'Drive' —
-    тоді беремо реальну назву через drives().get(driveId=...).
-    """
-    service = get_service()
-    try:
-        meta = service.files().get(
-            fileId=folder_id,
-            fields="id, name, mimeType",
-            supportsAllDrives=True,
-        ).execute()
-        name = meta.get("name")
-    except Exception:
-        name = None
-
-    if name in (None, "Drive"):
-        # Можливо це сам Shared Drive — спробуємо drives().get
-        try:
-            drive_meta = service.drives().get(
-                driveId=folder_id,
-                fields="id, name",
-            ).execute()
-            name = drive_meta.get("name") or name
-        except Exception:
-            pass
-    return name
+    """Назва папки/драйва (handles Shared Drive root quirk)."""
+    return get_folder_or_drive_name(folder_id)
 
 
 def _build_resolve_ctx() -> ResolveContext:

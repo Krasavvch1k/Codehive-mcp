@@ -465,3 +465,38 @@ def build_path_for_file(
     path = " > ".join(reversed(breadcrumbs))
     _path_cache[file_id] = (path, now)
     return path
+
+
+def get_folder_or_drive_name(folder_id: str) -> Optional[str]:
+    """
+    Best-effort fetch of a folder display name.
+
+    Handles the Shared Drive root quirk: files().get() for a Shared Drive
+    root returns name="Drive" instead of the actual drive name. In that case
+    we fall back to drives().get(driveId=...) which returns the real name.
+
+    Returns None on any failure (caller decides how to handle).
+    """
+    service = get_service()
+    try:
+        meta = service.files().get(
+            fileId=folder_id,
+            fields="id, name, mimeType",
+            supportsAllDrives=True,
+        ).execute()
+        name = meta.get("name")
+    except Exception:
+        name = None
+
+    if name in (None, "Drive"):
+        # Might be the Shared Drive root itself — try drives().get
+        try:
+            drive_meta = service.drives().get(
+                driveId=folder_id,
+                fields="id, name",
+            ).execute()
+            name = drive_meta.get("name") or name
+        except Exception:
+            pass
+
+    return name

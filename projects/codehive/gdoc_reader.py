@@ -5,6 +5,7 @@ from typing import Optional
 from shared.drive_client import (
     _list_folder_children,
     download_file,
+    get_folder_or_drive_name,
     get_service,
 )
 from projects.codehive.config import (
@@ -35,30 +36,7 @@ def _resolve_root(folder_id: Optional[str]) -> str:
 
 def _get_folder_name(folder_id: str) -> Optional[str]:
     """Best-effort fetch of a folder display name (handles Shared Drive root quirk)."""
-    service = get_service()
-    try:
-        meta = service.files().get(
-            fileId=folder_id,
-            fields="id, name, mimeType",
-            supportsAllDrives=True,
-        ).execute()
-        name = meta.get("name")
-    except Exception:
-        name = None
-
-    # Drive API quirk: files().get() для Shared Drive root повертає "Drive".
-    # Реальна назва — у drives().get(driveId=...).
-    if name in (None, "Drive") and folder_id == CODEHIVE_ROOT_FOLDER_ID:
-        try:
-            drive_meta = service.drives().get(
-                driveId=folder_id,
-                fields="id, name",
-            ).execute()
-            name = drive_meta.get("name") or name
-        except Exception:
-            pass
-
-    return name
+    return get_folder_or_drive_name(folder_id)
 
 
 def _classify_item(item: dict) -> str:
